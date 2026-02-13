@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VersatlyTask - Login Mockup v2</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #080a13;
+      overflow: hidden;
+    }
+
+    /* ===================== BACKGROUND ===================== */
+    .bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    .bg-base {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 50% at 50% 0%, rgba(102, 126, 234, 0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 20% 80%, rgba(118, 75, 162, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse 50% 40% at 80% 80%, rgba(102, 126, 234, 0.06) 0%, transparent 50%),
+        #080a13;
+    }
+
+    .bg-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(102, 126, 234, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(102, 126, 234, 0.025) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse 60% 50% at 50% 40%, black 20%, transparent 70%);
+      -webkit-mask-image: radial-gradient(ellipse 60% 50% at 50% 40%, black 20%, transparent 70%);
+    }
+
+    /* Glow behind card */
+    .bg-glow {
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(102, 126, 234, 0.07) 0%, transparent 70%);
+      filter: blur(40px);
+      animation: pulse 8s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
+      50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+    }
+
+    /* Floating particles */
+    .particles {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    .particle {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: rgba(102, 126, 234, 0.3);
+      animation: drift linear infinite;
+    }
+
+    @keyframes drift {
+      0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { transform: translateY(-10vh) rotate(360deg); opacity: 0; }
+    }
+
+    /* ===================== CARD ===================== */
+    .login-container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 440px;
+      padding: 0 20px;
+    }
+
+    /* Logo / Brand */
+    .brand {
+      text-align: center;
+      margin-bottom: 32px;
+      animation: slideDown 0.7s ease-out both;
+    }
+
+    .brand-logo {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3), 0 0 60px rgba(102, 126, 234, 0.1);
+      margin-bottom: 16px;
+    }
+
+    .brand-logo svg {
+      width: 28px;
+      height: 28px;
+      color: white;
+    }
+
+    .brand-name {
+      font-size: 26px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #e4e6eb 0%, #a3b1e8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+
+    .brand-tagline {
+      font-size: 14px;
+      color: #5a5f7a;
+      font-weight: 400;
+    }
+
+    /* Glass card */
+    .card {
+      background: rgba(14, 16, 28, 0.7);
+      border: 1px solid rgba(102, 126, 234, 0.1);
+      border-radius: 24px;
+      padding: 40px 36px;
+      backdrop-filter: blur(40px);
+      box-shadow:
+        0 24px 64px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+        0 1px 0 rgba(255, 255, 255, 0.04) inset;
+      animation: cardAppear 0.8s ease-out both;
+      animation-delay: 0.15s;
+    }
+
+    @keyframes cardAppear {
+      from {
+        opacity: 0;
+        transform: translateY(24px) scale(0.98);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Card header */
+    .card-header {
+      margin-bottom: 28px;
+    }
+
+    .card-header h2 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #e4e6eb;
+      margin-bottom: 6px;
+    }
+
+    .card-header p {
+      font-size: 14px;
+      color: #5a5f7a;
+    }
+
+    /* Social buttons row */
+    .social-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .btn-social {
+      flex: 1;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(102, 126, 234, 0.08);
+      background: rgba(20, 22, 36, 0.5);
+      color: #b8bcc8;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.25s ease;
+    }
+
+    .btn-social:hover {
+      background: rgba(102, 126, 234, 0.08);
+      border-color: rgba(102, 126, 234, 0.18);
+      transform: translateY(-1px);
+    }
+
+    .btn-social svg { width: 18px; height: 18px; }
+
+    /* Divider */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .divider-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.12), transparent);
+    }
+
+    .divider span {
+      font-size: 11px;
+      color: #3d4162;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* Form */
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #8b8fa3;
+      margin-bottom: 7px;
+    }
+
+    .input-wrapper {
+      position: relative;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 13px 16px 13px 44px;
+      border-radius: 14px;
+      border: 1.5px solid rgba(102, 126, 234, 0.08);
+      background: rgba(15, 17, 28, 0.8);
+      color: #e4e6eb;
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      transition: all 0.25s ease;
+      outline: none;
+    }
+
+    .form-input::placeholder { color: #2e3350; }
+
+    .form-input:hover {
+      border-color: rgba(102, 126, 234, 0.18);
+    }
+
+    .form-input:focus {
+      border-color: rgba(102, 126, 234, 0.45);
+      background: rgba(15, 17, 28, 1);
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.06);
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #333758;
+      transition: color 0.25s;
+      pointer-events: none;
+    }
+
+    .input-icon svg { width: 18px; height: 18px; }
+
+    .form-input:focus ~ .input-icon { color: #667eea; }
+
+    .password-toggle {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #333758;
+      cursor: pointer;
+      padding: 2px;
+      transition: color 0.25s;
+    }
+
+    .password-toggle:hover { color: #667eea; }
+    .password-toggle svg { width: 18px; height: 18px; }
+
+    /* Options row */
+    .options-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .checkbox-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #6b7094;
+    }
+
+    .chk {
+      width: 16px;
+      height: 16px;
+      border-radius: 5px;
+      border: 1.5px solid rgba(102, 126, 234, 0.15);
+      background: rgba(15, 17, 28, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .checkbox-wrap:hover .chk { border-color: rgba(102, 126, 234, 0.35); }
+
+    .chk.on {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border-color: transparent;
+    }
+
+    .chk svg { width: 10px; height: 10px; color: white; opacity: 0; transition: opacity 0.15s; }
+    .chk.on svg { opacity: 1; }
+
+    .forgot {
+      font-size: 13px;
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .forgot:hover { color: #a78bfa; }
+
+    /* Submit button */
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      border-radius: 14px;
+      border: none;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 20px rgba(102, 126, 234, 0.25);
+    }
+
+    .btn-submit::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, #7c8ff5 0%, #8b5cc7 100%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .btn-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(102, 126, 234, 0.35);
+    }
+
+    .btn-submit:hover::before { opacity: 1; }
+    .btn-submit:active { transform: translateY(0); }
+
+    .btn-submit span {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-submit span svg { width: 18px; height: 18px; }
+
+    /* Footer / register */
+    .card-footer {
+      text-align: center;
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(102, 126, 234, 0.06);
+    }
+
+    .card-footer p {
+      font-size: 13px;
+      color: #4a4f6a;
+    }
+
+    .card-footer a {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.2s;
+    }
+
+    .card-footer a:hover { color: #a78bfa; }
+
+    /* Bottom features */
+    .bottom-features {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 28px;
+      animation: fadeIn 1s ease-out both;
+      animation-delay: 0.6s;
+    }
+
+    .feat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #3d4162;
+      font-weight: 500;
+    }
+
+    .feat-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #667eea;
+      opacity: 0.5;
+    }
+
+    /* Staggered form animations */
+    .anim-1 { animation: fieldIn 0.5s ease-out both; animation-delay: 0.3s; }
+    .anim-2 { animation: fieldIn 0.5s ease-out both; animation-delay: 0.4s; }
+    .anim-3 { animation: fieldIn 0.5s ease-out both; animation-delay: 0.45s; }
+    .anim-4 { animation: fieldIn 0.5s ease-out both; animation-delay: 0.5s; }
+    .anim-5 { animation: fieldIn 0.5s ease-out both; animation-delay: 0.55s; }
+    .anim-6 { animation: fieldIn 0.5s ease-out both; animation-delay: 0.6s; }
+    .anim-7 { animation: fieldIn 0.5s ease-out both; animation-delay: 0.65s; }
+    .anim-8 { animation: fieldIn 0.5s ease-out both; animation-delay: 0.7s; }
+
+    @keyframes fieldIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* ===================== RESPONSIVE ===================== */
+    @media (max-width: 480px) {
+      .card { padding: 32px 24px; border-radius: 20px; }
+      .brand-name { font-size: 22px; }
+      .social-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Background -->
+  <div class="bg">
+    <div class="bg-base"></div>
+    <div class="bg-grid"></div>
+    <div class="bg-glow"></div>
+    <div class="particles">
+      <div class="particle" style="left:10%;animation-duration:18s;animation-delay:0s;width:2px;height:2px;"></div>
+      <div class="particle" style="left:25%;animation-duration:22s;animation-delay:3s;"></div>
+      <div class="particle" style="left:40%;animation-duration:16s;animation-delay:6s;width:2px;height:2px;"></div>
+      <div class="particle" style="left:55%;animation-duration:20s;animation-delay:1s;"></div>
+      <div class="particle" style="left:70%;animation-duration:24s;animation-delay:4s;width:2px;height:2px;"></div>
+      <div class="particle" style="left:85%;animation-duration:19s;animation-delay:7s;"></div>
+      <div class="particle" style="left:15%;animation-duration:21s;animation-delay:9s;width:4px;height:4px;opacity:0.15;"></div>
+      <div class="particle" style="left:60%;animation-duration:17s;animation-delay:2s;width:4px;height:4px;opacity:0.15;"></div>
+    </div>
+  </div>
+
+  <!-- Login -->
+  <div class="login-container">
+
+    <!-- Brand -->
+    <div class="brand">
+      <div class="brand-logo">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+      </div>
+      <div class="brand-name">VersatlyTask</div>
+      <div class="brand-tagline">Gerencie projetos com simplicidade</div>
+    </div>
+
+    <!-- Card -->
+    <div class="card">
+
+      <div class="card-header anim-1">
+        <h2>Bem-vindo de volta</h2>
+        <p>Entre na sua conta para continuar</p>
+      </div>
+
+      <!-- Social -->
+      <div class="social-row anim-2">
+        <button class="btn-social">
+          <svg viewBox="0 0 24 24">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          Google
+        </button>
+        <button class="btn-social">
+          <svg viewBox="0 0 24 24" fill="#b8bcc8">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+          GitHub
+        </button>
+      </div>
+
+      <div class="divider anim-3">
+        <div class="divider-line"></div>
+        <span>ou com email</span>
+        <div class="divider-line"></div>
+      </div>
+
+      <!-- Form -->
+      <form onsubmit="event.preventDefault()">
+        <div class="form-group anim-4">
+          <label class="form-label">Email</label>
+          <div class="input-wrapper">
+            <input type="email" class="form-input" placeholder="seu@email.com" autocomplete="email">
+            <div class="input-icon">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group anim-5">
+          <label class="form-label">Senha</label>
+          <div class="input-wrapper">
+            <input type="password" class="form-input" placeholder="Digite sua senha" id="pw" autocomplete="current-password">
+            <div class="input-icon">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+              </svg>
+            </div>
+            <button type="button" class="password-toggle" onclick="togglePw()">
+              <svg id="eyeIc" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="options-row anim-6">
+          <label class="checkbox-wrap" onclick="toggleChk(this)">
+            <div class="chk">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            Lembrar de mim
+          </label>
+          <a href="#" class="forgot">Esqueceu a senha?</a>
+        </div>
+
+        <button type="submit" class="btn-submit anim-7">
+          <span>
+            Entrar
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+            </svg>
+          </span>
+        </button>
+      </form>
+
+      <div class="card-footer anim-8">
+        <p>Ainda nao tem conta? <a href="#">Criar conta gratis</a></p>
+      </div>
+    </div>
+
+    <!-- Bottom features -->
+    <div class="bottom-features">
+      <div class="feat"><div class="feat-dot"></div> Tempo real</div>
+      <div class="feat"><div class="feat-dot"></div> Colaborativo</div>
+      <div class="feat"><div class="feat-dot"></div> Drag & Drop</div>
+      <div class="feat"><div class="feat-dot"></div> Seguro</div>
+    </div>
+  </div>
+
+  <script>
+    function togglePw() {
+      const i = document.getElementById('pw');
+      const ic = document.getElementById('eyeIc');
+      if (i.type === 'password') {
+        i.type = 'text';
+        ic.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"/>';
+      } else {
+        i.type = 'password';
+        ic.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>';
+      }
+    }
+
+    function toggleChk(el) {
+      el.querySelector('.chk').classList.toggle('on');
+    }
+
+    document.querySelectorAll('.form-input').forEach(inp => {
+      inp.addEventListener('focus', () => {
+        inp.closest('.input-wrapper').querySelector('.input-icon').style.color = '#667eea';
+      });
+      inp.addEventListener('blur', () => {
+        inp.closest('.input-wrapper').querySelector('.input-icon').style.color = '#333758';
+      });
+    });
+  </script>
+</body>
+</html>
