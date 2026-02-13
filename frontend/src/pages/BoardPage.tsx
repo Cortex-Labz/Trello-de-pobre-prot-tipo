@@ -1183,7 +1183,7 @@ export default function BoardPage() {
         >
           <div className="flex items-center gap-4">
             <Link
-              to={`/workspace/${board.workspaceId}`}
+              to="/dashboard"
               className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:translate-x-[-4px]"
               style={{
                 background: 'var(--surface-secondary)',
