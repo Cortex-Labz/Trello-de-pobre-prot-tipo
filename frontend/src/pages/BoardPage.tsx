@@ -45,10 +45,28 @@ const formatCompletionTime = (minutes: number | null | undefined): string => {
 const CardItem = memo(({ card, formatTime }: { card: Card; formatTime: (minutes: number | null | undefined) => string }) => {
   return (
     <>
+      {/* Card Cover Image - on top, before title */}
+      {card.coverAttachmentId && card.attachments && (() => {
+        const coverImage = card.attachments.find(att => att.id === card.coverAttachmentId);
+        if (coverImage) {
+          return (
+            <div className="overflow-hidden relative group" style={{ margin: '-10px -12px 8px -12px', borderRadius: '10px 10px 0 0' }}>
+              <img
+                src={coverImage.url}
+                alt={coverImage.name}
+                className="w-full object-cover"
+                style={{ maxHeight: '140px', display: 'block' }}
+              />
+            </div>
+          );
+        }
+        return null;
+      })()}
+
       <div className="flex items-center justify-between gap-2 mb-1">
         <h4
-          className="font-semibold text-sm leading-snug flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
-          style={{ color: 'var(--text-primary)' }}
+          className="font-medium leading-snug flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+          style={{ color: '#e4e6eb', fontSize: '13px' }}
           title={card.title}
         >
           {card.title}
@@ -98,42 +116,23 @@ const CardItem = memo(({ card, formatTime }: { card: Card; formatTime: (minutes:
       </div>
 
       {card.description && (
-        <p className="text-xs mt-1.5 line-clamp-2 leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
+        <p className="mt-1 line-clamp-2 leading-snug" style={{ color: '#6b7084', fontSize: '11.5px' }}>
           {card.description}
         </p>
       )}
 
-      {/* Card Cover Image */}
-      {card.coverAttachmentId && card.attachments && (() => {
-        const coverImage = card.attachments.find(att => att.id === card.coverAttachmentId);
-        if (coverImage) {
-          return (
-            <div className="mt-2 rounded-lg overflow-hidden relative group">
-              <img
-                src={coverImage.url}
-                alt={coverImage.name}
-                className="w-full h-auto max-h-48 object-cover"
-              />
-              <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                Capa
-              </div>
-            </div>
-          );
-        }
-        return null;
-      })()}
-
       {/* Card Footer */}
       {((card.labels?.length || 0) > 0 || (card.members?.length || 0) > 0) && (
-        <div className="flex items-center gap-2 mt-3 pt-2 border-t" style={{ borderColor: 'var(--border-color)' }}>
+        <div className="flex items-center gap-1.5 mt-2 pt-2 border-t" style={{ borderColor: 'rgba(255, 255, 255, 0.04)' }}>
           {/* Labels */}
           {card.labels && card.labels.length > 0 && (
             <div className="flex gap-1 flex-wrap">
               {card.labels.slice(0, 3).map((cl) => (
                 <div
                   key={cl.label.id}
-                  className="px-2 py-0.5 rounded text-white text-xs font-medium"
-                  style={{ backgroundColor: cl.label.color }}
+                  className="px-2 py-0.5 rounded text-white font-semibold"
+                  // Label matching mockup size
+                  style={{ backgroundColor: cl.label.color, fontSize: '10px', lineHeight: '1.4' }}
                   title={cl.label.name}
                 >
                   {cl.label.name}
@@ -148,9 +147,12 @@ const CardItem = memo(({ card, formatTime }: { card: Card; formatTime: (minutes:
               {card.members.slice(0, 3).map((cm) => (
                 <div
                   key={cm.id}
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold ring-2 ring-gray-200 dark:ring-gray-700"
+                  className="w-[22px] h-[22px] rounded-full flex items-center justify-center text-white font-bold"
                   style={{
-                    background: 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    fontSize: '9px',
+                    marginLeft: '-4px',
+                    border: '1.5px solid rgba(25, 28, 40, 0.9)',
                   }}
                   title={cm.user.name}
                 >
@@ -226,16 +228,16 @@ const ListColumn = memo(
 
     return (
       <div
-        className="flex-shrink-0 w-72 rounded-xl overflow-hidden transition-all duration-300"
+        className="flex-shrink-0 w-[280px] rounded-[14px] overflow-hidden transition-all duration-300"
         style={{
           transform: 'none',
-          background: 'var(--surface-primary)',
-          border: '1px solid var(--border-color)',
+          background: '#12141c',
+          border: '1px solid rgba(255, 255, 255, 0.06)',
           boxShadow: list.backgroundColor
             ? `0 4px 20px -2px ${list.backgroundColor.includes('gradient')
                 ? 'rgba(102, 126, 234, 0.15)'
-                : list.backgroundColor + '40'}, 0 2px 8px var(--shadow-color)`
-            : '0 2px 8px var(--shadow-color), 0 0 0 1px var(--border-color)',
+                : list.backgroundColor + '40'}, 0 2px 8px rgba(0, 0, 0, 0.15)`
+            : '0 4px 20px rgba(0, 0, 0, 0.15)',
         }}
       >
         <div
@@ -243,16 +245,18 @@ const ListColumn = memo(
         >
         {/* List Header */}
         <div
-          className="px-4 py-3 group relative overflow-hidden"
+          className="group relative overflow-hidden"
+          // List header padding matching mockup
           style={{
+            padding: '12px 14px 10px',
             background: 'transparent',
-            borderBottom: '1px solid var(--border-color)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
           }}
         >
           {/* Barra colorida no topo */}
           {list.backgroundColor && (
             <div
-              className="absolute top-0 left-0 right-0 h-1"
+              className="absolute top-0 left-0 right-0 h-[3px]"
               style={{
                 background: list.backgroundColor,
               }}
@@ -274,19 +278,20 @@ const ListColumn = memo(
                     handleCancelEditing();
                   }
                 }}
-                className="font-bold text-base flex-1 tracking-tight px-2 py-1 rounded-lg focus:outline-none"
+                className="font-semibold flex-1 px-1.5 py-0.5 rounded-md focus:outline-none"
                 style={{
-                  color: 'var(--text-primary)',
-                  background: 'var(--surface-secondary)',
-                  border: '2px solid var(--bg-gradient-start)',
+                  color: '#e4e6eb',
+                  fontSize: '13.5px',
+                  background: 'rgba(31, 35, 51, 0.9)',
+                  border: '1.5px solid rgba(102, 126, 234, 0.5)',
                 }}
                 autoFocus
                 onFocus={(e) => e.target.select()}
               />
             ) : (
               <h3
-                className="font-bold text-base flex-1 tracking-tight cursor-pointer px-2 py-1 rounded-lg hover:bg-opacity-50 transition-all"
-                style={{ color: 'var(--text-primary)' }}
+                className="font-semibold flex-1 cursor-pointer px-1.5 py-0.5 rounded-md hover:bg-opacity-50 transition-all"
+                style={{ color: '#e4e6eb', fontSize: '13.5px' }}
                 onClick={handleStartEditing}
                 onDoubleClick={handleStartEditing}
                 title="Clique para renomear"
@@ -299,10 +304,10 @@ const ListColumn = memo(
                 e.stopPropagation();
                 onListMenuClick(e, list);
               }}
-              className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:scale-110 opacity-0 group-hover:opacity-100 hover:rotate-90"
+              className="w-[26px] h-[26px] rounded-[7px] flex items-center justify-center transition-all hover:scale-110 opacity-0 group-hover:opacity-100 flex-shrink-0"
               style={{
-                background: 'var(--surface-secondary)',
-                color: 'var(--text-secondary)',
+                background: 'transparent',
+                color: '#5a5f73',
               }}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -310,10 +315,13 @@ const ListColumn = memo(
               </svg>
             </button>
             <span
-              className="text-xs font-semibold px-2.5 py-1 rounded-full"
+              className="font-semibold px-2 rounded-[10px] flex-shrink-0"
+              // Count badge matching mockup
               style={{
-                color: 'var(--text-secondary)',
-                background: 'var(--surface-secondary)',
+                color: '#5a5f73',
+                fontSize: '11px',
+                padding: '2px 8px',
+                background: 'rgba(255, 255, 255, 0.05)',
               }}
             >
               {list.cards?.length || 0}
@@ -327,10 +335,12 @@ const ListColumn = memo(
             <div
               {...provided.droppableProps}
               ref={provided.innerRef}
-              className="flex-1 overflow-y-auto p-3 flex flex-col gap-2.5"
+              className="flex-1 overflow-y-auto flex flex-col gap-2"
+              // Cards container padding via style
               style={{
                 minHeight: '10px',
-                background: snapshot.isDraggingOver ? 'var(--surface-hover)' : 'transparent',
+                padding: '2px 10px 6px',
+                background: snapshot.isDraggingOver ? 'rgba(102, 126, 234, 0.05)' : 'transparent',
                 transition: 'background 0.2s ease',
               }}
             >
@@ -362,18 +372,19 @@ const ListColumn = memo(
                           e.preventDefault();
                           onCardContextMenu(e, card);
                         }}
-                        className="rounded-lg p-3 cursor-pointer transition-all hover:scale-[1.02] group"
+                        className="rounded-[10px] cursor-pointer transition-all hover:scale-[1.02] group"
                         style={{
                           ...provided.draggableProps.style,
-                          background: 'var(--surface-secondary)',
+                          padding: '10px 12px',
+                          background: 'rgba(25, 28, 40, 0.7)',
                           border: isHighlighted
-                            ? '2px solid rgba(102, 126, 234, 0.8)'
-                            : '1px solid var(--border-color)',
+                            ? '2px solid rgba(102, 126, 234, 0.6)'
+                            : '1px solid rgba(255, 255, 255, 0.04)',
                           boxShadow: snapshot.isDragging
-                            ? '0 12px 32px rgba(0, 0, 0, 0.2)'
+                            ? '0 12px 32px rgba(0, 0, 0, 0.5)'
                             : isHighlighted
-                            ? '0 0 20px rgba(102, 126, 234, 0.4), 0 1px 3px var(--shadow-color)'
-                            : '0 1px 3px var(--shadow-color)',
+                            ? '0 0 16px rgba(102, 126, 234, 0.2)'
+                            : 'none',
                           opacity: isBeingDragged && !snapshot.isDragging ? 0 : 1,
                           pointerEvents: isBeingDragged && !snapshot.isDragging ? 'none' : 'auto',
                         }}
@@ -394,13 +405,13 @@ const ListColumn = memo(
         </Droppable>
 
         {/* Add Card Button - Outside droppable so it gets pushed down */}
-        <div className="px-3 pb-3">
+        <div style={{ padding: '6px 10px 10px' }}>
           {showNewCard ? (
             <div
               className="rounded-lg p-3 shadow-sm"
               style={{
-                background: 'var(--surface-secondary)',
-                border: '1px solid var(--border-color)',
+                background: 'rgba(25, 28, 40, 0.6)',
+                border: '1px solid rgba(102, 126, 234, 0.15)',
               }}
             >
               <textarea
@@ -409,9 +420,9 @@ const ListColumn = memo(
                 placeholder="Digite o título do card..."
                 className="w-full px-3 py-2 rounded-lg focus:outline-none resize-none text-sm"
                 style={{
-                  background: 'var(--surface-primary)',
+                  background: 'rgba(15, 17, 23, 0.6)',
                   color: 'var(--text-primary)',
-                  border: '2px solid var(--bg-gradient-start)',
+                  border: '1.5px solid rgba(102, 126, 234, 0.2)',
                 }}
                 rows={2}
                 autoFocus
@@ -431,7 +442,7 @@ const ListColumn = memo(
                   disabled={!newCardTitle.trim() || isCreatingCard}
                   className="px-4 py-2 text-white rounded-lg transition-all text-sm font-semibold disabled:opacity-50 hover:scale-105"
                   style={{
-                    background: 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   }}
                 >
                   Adicionar
@@ -440,8 +451,8 @@ const ListColumn = memo(
                   onClick={onCancelNewCard}
                   className="px-3 py-2 rounded-lg transition-all text-sm font-medium hover:scale-105"
                   style={{
-                    color: 'var(--text-secondary)',
-                    background: 'var(--surface-hover)',
+                    color: '#8b8fa3',
+                    background: 'rgba(255, 255, 255, 0.05)',
                   }}
                 >
                   Cancelar
@@ -451,14 +462,17 @@ const ListColumn = memo(
           ) : (
             <button
               onClick={onShowNewCard}
-              className="w-full p-2.5 rounded-lg transition-all text-sm font-medium text-left flex items-center gap-2 hover:scale-[1.02] hover:shadow-sm"
+              className="w-full rounded-lg transition-all font-medium text-left flex items-center gap-1.5 hover:scale-[1.02] hover:shadow-sm"
               style={{
-                color: 'var(--text-secondary)',
+                padding: '8px 10px',
+                borderRadius: '8px',
+                color: '#5a5f73',
+                fontSize: '12px',
                 background: 'transparent',
-                border: '2px dashed var(--border-color)',
+                border: '1.5px dashed rgba(255, 255, 255, 0.08)',
               }}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
               Adicionar card
@@ -1094,11 +1108,11 @@ export default function BoardPage() {
   };
 
   const handleApplyBackgroundColor = (color: string) => {
-    updateBoardMutation.mutate({ backgroundColor: color, backgroundImageUrl: undefined });
+    updateBoardMutation.mutate({ backgroundColor: color, backgroundImageUrl: null as any });
   };
 
   const handleApplyBackgroundImage = (imageUrl: string) => {
-    updateBoardMutation.mutate({ backgroundColor: undefined, backgroundImageUrl: imageUrl });
+    updateBoardMutation.mutate({ backgroundColor: null as any, backgroundImageUrl: imageUrl });
   };
 
   const board = boardData?.board;
@@ -1109,7 +1123,7 @@ export default function BoardPage() {
       <div
         className="min-h-screen flex items-center justify-center"
         style={{
-          background: 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         }}
       >
         <div
@@ -1125,7 +1139,7 @@ export default function BoardPage() {
       <div
         className="min-h-screen flex items-center justify-center"
         style={{
-          background: 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         }}
       >
         <div className="text-center">
@@ -1135,7 +1149,7 @@ export default function BoardPage() {
           <Link
             to="/dashboard"
             className="font-medium"
-            style={{ color: 'var(--bg-gradient-start)' }}
+            style={{ color: '#667eea' }}
           >
             Voltar para Dashboard
           </Link>
@@ -1153,16 +1167,17 @@ export default function BoardPage() {
         backgroundRepeat: 'no-repeat',
       };
     }
-    if (board?.backgroundColor) {
+    if (board?.backgroundColor && board.backgroundColor !== '#667eea') {
       return { background: board.backgroundColor };
     }
-    return { background: 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)' };
+    return { background: 'linear-gradient(145deg, #1a1d2e 0%, #2d1b4e 35%, #1b2a4a 65%, #141825 100%)' };
   };
 
   return (
     <MainLayout>
       <div
-        className="flex flex-col h-full p-6 relative"
+        className="flex flex-col h-full relative"
+        // Board area padding handled by children
         style={getBoardBackground()}
       >
         {/* Overlay para melhorar legibilidade quando há imagem de fundo */}
@@ -1174,23 +1189,27 @@ export default function BoardPage() {
         )}
         {/* Board Header */}
         <div
-          className="mb-6 p-4 rounded-2xl shadow-lg relative z-10"
+          className="rounded-[14px] shadow-lg relative z-10"
+          // Board header - mockup dimensions
+          // margin applied via style for precise control
           style={{
-            background: 'var(--surface-primary)',
-            backdropFilter: 'blur(10px)',
-            boxShadow: '0 4px 20px var(--shadow-color)',
+            margin: '12px 16px 0',
+            background: 'rgba(15, 17, 23, 0.6)',
+            backdropFilter: 'blur(24px)',
+            border: '1px solid rgba(255, 255, 255, 0.06)',
+            boxShadow: '0 4px 24px rgba(0, 0, 0, 0.25)',
           }}
         >
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3" style={{ padding: '10px 16px' }}>
             <Link
               to="/dashboard"
-              className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:translate-x-[-4px]"
+              className="w-[34px] h-[34px] rounded-[9px] flex items-center justify-center transition-all hover:translate-x-[-2px] flex-shrink-0"
               style={{
-                background: 'var(--surface-secondary)',
-                color: 'var(--text-secondary)',
+                background: 'rgba(255, 255, 255, 0.06)',
+                color: '#b8bcc8',
               }}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -1199,17 +1218,21 @@ export default function BoardPage() {
                 />
               </svg>
             </Link>
-            <div className="flex-1">
+
+            {/* Divider */}
+            <div className="flex-shrink-0" style={{ width: '1px', height: '24px', background: 'rgba(255, 255, 255, 0.08)' }} />
+
+            <div className="flex-1 min-w-0">
               <h1
-                className="text-2xl font-bold"
-                style={{ color: 'var(--text-primary)' }}
+                className="text-[16px] font-bold leading-tight truncate"
+                style={{ color: '#e4e6eb', letterSpacing: '-0.3px' }}
               >
                 {board.name}
               </h1>
               {board.description && (
                 <span
-                  className="text-sm"
-                  style={{ color: 'var(--text-secondary)' }}
+                  className="text-[11px]"
+                  style={{ color: '#6b7084' }}
                 >
                   {board.description}
                 </span>
@@ -1217,23 +1240,19 @@ export default function BoardPage() {
             </div>
 
             {/* Search Bar */}
-            <div className="flex-shrink-0 w-64">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Buscar cards..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 rounded-lg text-sm transition-all focus:ring-2"
-                  style={{
-                    background: 'var(--surface-secondary)',
-                    color: 'var(--text-primary)',
-                    border: '1px solid var(--border-color)',
-                  }}
-                />
+            <div className="flex-shrink-0" style={{ width: '220px' }}>
+              <div
+                className="flex items-center gap-2 transition-all focus-within:w-[260px]"
+                style={{
+                  padding: '7px 12px',
+                  borderRadius: '9px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                }}
+              >
                 <svg
-                  className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2"
-                  style={{ color: 'var(--text-tertiary)' }}
+                  className="w-3.5 h-3.5 flex-shrink-0"
+                  style={{ color: '#5a5f73' }}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1245,13 +1264,21 @@ export default function BoardPage() {
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                   />
                 </svg>
+                <input
+                  type="text"
+                  placeholder="Buscar cards..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-transparent border-none outline-none text-xs"
+                  style={{ color: '#e4e6eb' }}
+                />
                 {searchTerm && (
                   <button
                     onClick={() => setSearchTerm('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                    style={{ color: 'var(--text-tertiary)' }}
+                    className="flex-shrink-0"
+                    style={{ color: '#5a5f73' }}
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
@@ -1259,16 +1286,72 @@ export default function BoardPage() {
               </div>
             </div>
 
+            {/* Member Avatars */}
+            {board?.members && board.members.length > 0 && (
+              <div className="flex items-center flex-shrink-0">
+                {board.members.slice(0, 3).map((member: any, idx: number) => {
+                  const gradients = [
+                    'linear-gradient(135deg, #667eea, #764ba2)',
+                    'linear-gradient(135deg, #f093fb, #f5576c)',
+                    'linear-gradient(135deg, #0093E9, #80D0C7)',
+                  ];
+                  return (
+                    <div
+                      key={member.id || idx}
+                      className="flex items-center justify-center text-white cursor-pointer transition-all hover:-translate-y-0.5"
+                      style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        background: gradients[idx % gradients.length],
+                        border: '2px solid rgba(15, 17, 23, 0.8)',
+                        marginLeft: idx === 0 ? '0' : '-6px',
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        zIndex: 3 - idx,
+                      }}
+                      title={member.user?.name || member.name}
+                    >
+                      {(member.user?.name || member.name || '?').charAt(0).toUpperCase()}
+                      {(member.user?.name || member.name || '?').split(' ')[1]?.charAt(0)?.toUpperCase() || ''}
+                    </div>
+                  );
+                })}
+                {board.members.length > 3 && (
+                  <div
+                    className="flex items-center justify-center text-white cursor-pointer"
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: '2px solid rgba(15, 17, 23, 0.8)',
+                      marginLeft: '-6px',
+                      fontSize: '10px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    +{board.members.length - 3}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={() => setShowMembersModal(true)}
-              className="px-4 py-2 rounded-lg font-medium text-sm transition-all hover:scale-105 flex items-center gap-2"
+              className="flex items-center gap-1.5 transition-all hover:scale-105"
               style={{
-                background: 'var(--surface-secondary)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
+                padding: '7px 14px',
+                borderRadius: '9px',
+                background: 'rgba(255, 255, 255, 0.06)',
+                color: '#b8bcc8',
+                fontSize: '12px',
+                fontWeight: 500,
+                border: 'none',
               }}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
               </svg>
               Membros
@@ -1276,40 +1359,49 @@ export default function BoardPage() {
 
             <button
               onClick={() => setShowBackgroundModal(true)}
-              className="px-4 py-2 rounded-lg font-medium text-sm transition-all hover:scale-105 flex items-center gap-2"
+              className="flex items-center gap-1.5 transition-all hover:scale-105"
               style={{
-                background: 'var(--surface-secondary)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
+                padding: '7px 14px',
+                borderRadius: '9px',
+                background: 'rgba(255, 255, 255, 0.06)',
+                color: '#b8bcc8',
+                fontSize: '12px',
+                fontWeight: 500,
+                border: 'none',
               }}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              Alterar Fundo
+              Fundo
             </button>
 
             <button
               onClick={() => setShowArchivedModal(true)}
-              className="px-4 py-2 rounded-lg font-medium text-sm transition-all hover:scale-105 flex items-center gap-2"
+              className="flex items-center gap-1.5 transition-all hover:scale-105"
               style={{
-                background: 'var(--surface-secondary)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
+                padding: '7px 14px',
+                borderRadius: '9px',
+                background: 'rgba(255, 255, 255, 0.06)',
+                color: '#b8bcc8',
+                fontSize: '12px',
+                fontWeight: 500,
+                border: 'none',
               }}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
               </svg>
               Arquivados
             </button>
+            </div>
           </div>
         </div>
 
         {/* Board Content */}
-        <div className="flex-1 overflow-x-auto overflow-y-hidden relative z-10">
+        <div className="flex-1 overflow-x-auto overflow-y-hidden relative z-10" style={{ padding: '16px 16px 12px' }}>
         <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="flex gap-4 h-full items-start pb-4">
+          <div className="flex h-full items-start" style={{ gap: '14px' }}>
             {/* Lists */}
             {lists.map((list) => (
               <ListColumn
@@ -1338,11 +1430,11 @@ export default function BoardPage() {
           {/* Add List */}
           {showNewList ? (
             <div
-              className="flex-shrink-0 w-72 rounded-2xl p-4 shadow-lg"
+              className="flex-shrink-0 w-[280px] rounded-[14px] p-4 shadow-lg"
               style={{
-                background: 'var(--surface-primary)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid var(--border-color)',
+                background: 'rgba(15, 17, 23, 0.78)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
               }}
             >
               <form onSubmit={handleCreateList}>
@@ -1353,9 +1445,9 @@ export default function BoardPage() {
                   placeholder="Digite o nome da lista..."
                   className="w-full px-4 py-2.5 rounded-xl focus:outline-none"
                   style={{
-                    background: 'var(--surface-secondary)',
+                    background: 'rgba(25, 28, 40, 0.6)',
                     color: 'var(--text-primary)',
-                    border: '2px solid var(--bg-gradient-start)',
+                    border: '1.5px solid rgba(102, 126, 234, 0.3)',
                   }}
                   autoFocus
                   onKeyDown={(e) => {
@@ -1371,7 +1463,7 @@ export default function BoardPage() {
                     disabled={!newListTitle.trim() || createListMutation.isPending}
                     className="px-4 py-2 text-white rounded-lg transition-all text-sm font-medium disabled:opacity-50"
                     style={{
-                      background: 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)',
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                     }}
                   >
                     Adicionar lista
@@ -1384,8 +1476,8 @@ export default function BoardPage() {
                     }}
                     className="px-3 py-2 rounded-lg transition-colors text-sm"
                     style={{
-                      color: 'var(--text-secondary)',
-                      background: 'var(--surface-hover)',
+                      color: '#8b8fa3',
+                      background: 'rgba(255, 255, 255, 0.05)',
                     }}
                   >
                     Cancelar
@@ -1396,18 +1488,23 @@ export default function BoardPage() {
           ) : (
             <button
               onClick={() => setShowNewList(true)}
-              className="flex-shrink-0 w-72 h-auto min-h-[120px] rounded-2xl p-4 transition-all flex items-center justify-center gap-2 font-medium shadow-lg"
+              className="flex-shrink-0 w-[280px] h-auto min-h-[100px] rounded-[14px] transition-all flex flex-col items-center justify-center gap-1.5 font-medium"
               style={{
-                background: 'var(--surface-primary)',
+                background: 'rgba(15, 17, 23, 0.35)',
                 backdropFilter: 'blur(10px)',
-                border: '2px dashed var(--border-color)',
-                color: 'var(--text-secondary)',
+                border: '1.5px dashed rgba(255, 255, 255, 0.08)',
+                color: '#5a5f73',
               }}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Adicionar lista
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition-transform"
+                style={{ background: 'rgba(102, 126, 234, 0.1)' }}
+              >
+                <svg className="w-4 h-4" style={{ color: '#667eea' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
+                </svg>
+              </div>
+              <span style={{ fontSize: '12px', color: '#5a5f73', fontWeight: 500 }}>Adicionar lista</span>
             </button>
           )}
           </div>
@@ -1529,7 +1626,7 @@ export default function BoardPage() {
                   onClick={handleSaveCustomColor}
                   className="flex-1 px-4 py-2 rounded-xl font-medium transition-all hover:scale-105 text-white text-sm"
                   style={{
-                    background: 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   }}
                 >
                   Salvar e Aplicar
@@ -1788,7 +1885,7 @@ export default function BoardPage() {
                 disabled={!editingCardTitle.title.trim()}
                 className="px-4 py-2 rounded-lg transition-colors text-white disabled:opacity-50"
                 style={{
-                  background: 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 }}
               >
                 Salvar
@@ -1877,7 +1974,7 @@ export default function BoardPage() {
                 disabled={!formatDateToISO(dateInputValue)}
                 className="flex-1 px-4 py-2 rounded-lg transition-colors text-white disabled:opacity-50"
                 style={{
-                  background: 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 }}
               >
                 Salvar
@@ -1916,7 +2013,7 @@ export default function BoardPage() {
                     }}
                     className="w-full p-2 rounded-lg border transition-all hover:scale-105"
                     style={{
-                      borderColor: cardCoverDropdownOpen.coverAttachmentId === att.id ? 'var(--bg-gradient-start)' : 'var(--border-color)',
+                      borderColor: cardCoverDropdownOpen.coverAttachmentId === att.id ? '#667eea' : 'var(--border-color)',
                       background: 'var(--surface-secondary)',
                     }}
                   >
@@ -1948,7 +2045,7 @@ export default function BoardPage() {
               onClick={() => setCardCoverDropdownOpen(null)}
               className="w-full px-4 py-2 rounded-lg transition-colors text-white"
               style={{
-                background: 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               }}
             >
               Fechar
@@ -1996,11 +2093,11 @@ export default function BoardPage() {
                       }}
                       className="w-full flex items-center gap-3 p-3 rounded-lg transition-all hover:scale-105"
                       style={{
-                        background: isAssigned ? 'var(--bg-gradient-start)' : 'var(--surface-secondary)',
+                        background: isAssigned ? '#667eea' : 'var(--surface-secondary)',
                         color: isAssigned ? 'white' : 'var(--text-primary)',
                       }}
                     >
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold" style={{ background: 'var(--bg-gradient-start)' }}>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold" style={{ background: '#667eea' }}>
                         {member.user.name.charAt(0).toUpperCase()}
                       </div>
                       <span className="flex-1 text-left">{member.user.name}</span>
@@ -2022,7 +2119,7 @@ export default function BoardPage() {
               onClick={() => setCardMembersDropdownOpen(null)}
               className="w-full mt-4 px-4 py-2 rounded-lg transition-colors text-white"
               style={{
-                background: 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               }}
             >
               Fechar
@@ -2094,7 +2191,7 @@ export default function BoardPage() {
               onClick={() => setCardLabelsDropdownOpen(null)}
               className="w-full mt-4 px-4 py-2 rounded-lg transition-colors text-white"
               style={{
-                background: 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               }}
             >
               Fechar
@@ -2142,7 +2239,7 @@ export default function BoardPage() {
                 onClick={() => setBackgroundType('color')}
                 className="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all"
                 style={{
-                  background: backgroundType === 'color' ? 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)' : 'var(--surface-secondary)',
+                  background: backgroundType === 'color' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'var(--surface-secondary)',
                   color: backgroundType === 'color' ? 'white' : 'var(--text-secondary)',
                 }}
               >
@@ -2152,7 +2249,7 @@ export default function BoardPage() {
                 onClick={() => setBackgroundType('image')}
                 className="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all"
                 style={{
-                  background: backgroundType === 'image' ? 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)' : 'var(--surface-secondary)',
+                  background: backgroundType === 'image' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'var(--surface-secondary)',
                   color: backgroundType === 'image' ? 'white' : 'var(--text-secondary)',
                 }}
               >
@@ -2180,7 +2277,7 @@ export default function BoardPage() {
                       onClick={() => handleApplyBackgroundColor(`linear-gradient(135deg, ${customBoardColor} 0%, ${customBoardColor} 100%)`)}
                       className="flex-1 px-4 py-2 rounded-xl font-medium transition-all hover:scale-105 text-white text-sm"
                       style={{
-                        background: 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                       }}
                     >
                       Aplicar Cor Personalizada
@@ -2195,6 +2292,7 @@ export default function BoardPage() {
                   </label>
                   <div className="grid grid-cols-3 gap-3">
                     {[
+                      { name: 'Tema Escuro', gradient: 'linear-gradient(145deg, #1a1d2e 0%, #2d1b4e 35%, #1b2a4a 65%, #141825 100%)' },
                       { name: 'Trello Azul', gradient: 'linear-gradient(135deg, #0079bf 0%, #5e4db2 100%)' },
                       { name: 'Roxo Profundo', gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
                       { name: 'Rosa Vibrante', gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
@@ -2293,7 +2391,7 @@ export default function BoardPage() {
                       }}
                       className="px-6 py-3 rounded-xl font-medium transition-all hover:scale-105 text-white text-sm whitespace-nowrap"
                       style={{
-                        background: 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                       }}
                     >
                       Aplicar

@@ -101,6 +101,16 @@ textarea,
   user-select: text;
 }
 
+/* Header search glow on focus */
+.header-search-input:focus {
+  border-color: rgba(102, 126, 234, 0.5) !important;
+  box-shadow: 0 0 16px rgba(102, 126, 234, 0.15) !important;
+}
+
+.header-search-input::placeholder {
+  color: #6b7084;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

@@ -8,10 +8,10 @@ export default function ThemeToggle() {
     <>
       <button
         onClick={() => setIsSettingsOpen(true)}
-        className="p-2 rounded-lg transition-all duration-200"
+        className="w-10 h-10 rounded-[10px] flex items-center justify-center transition-all duration-200"
         style={{
-          background: 'var(--surface-secondary)',
-          color: 'var(--text-secondary)',
+          background: 'rgba(20, 22, 33, 0.6)',
+          color: '#9ca3af',
         }}
         title="Configurações"
         aria-label="Open settings"

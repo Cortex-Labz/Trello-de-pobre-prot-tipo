@@ -113,10 +113,10 @@ export default function NotificationDropdown() {
       {/* Notification Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:scale-105 relative group"
+        className="w-10 h-10 rounded-[10px] flex items-center justify-center transition-all hover:scale-105 relative group"
         style={{
-          background: isOpen ? 'var(--surface-tertiary)' : 'var(--surface-secondary)',
-          color: 'var(--text-secondary)',
+          background: isOpen ? 'rgba(20, 22, 33, 0.9)' : 'rgba(20, 22, 33, 0.6)',
+          color: '#9ca3af',
         }}
         title="Notificações"
       >
