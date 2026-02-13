@@ -1,0 +1,202 @@
+═══════════════════════════════════════════════════════════════════════
+  🚨 SISTEMA DE CONVITES E GERENCIAMENTO DE MEMBROS - PENDENTE
+  Data: 25/10/2024
+═══════════════════════════════════════════════════════════════════════
+
+📋 CONTEXTO:
+O usuário percebeu que o sistema de convites e gerenciamento de membros
+está INCOMPLETO. Atualmente:
+
+✅ O QUE JÁ EXISTE (Backend):
+  - Sistema de permissões completo (ADMIN, MEMBER, OBSERVER)
+  - API endpoints para adicionar/remover membros
+  - Verificações de permissão em todos os controllers
+  - Roles funcionando perfeitamente
+
+❌ O QUE ESTÁ FALTANDO:
+
+1. SISTEMA DE CONVITES (0% implementado):
+   - [ ] Model Invitation no banco de dados
+   - [ ] Tokens de convite com expiração
+   - [ ] Endpoint para enviar convite por email
+   - [ ] Endpoint para aceitar/recusar convite
+   - [ ] Serviço de email (nodemailer ou similar)
+   - [ ] Links de convite compartilháveis
+   - [ ] UI para enviar convites
+   - [ ] UI para aceitar/recusar convites
+   - [ ] Lista de convites pendentes
+
+2. BUSCA DE USUÁRIOS (0% implementado):
+   - [ ] Endpoint GET /api/users/search?email=xxx
+   - [ ] Endpoint GET /api/users/search?name=xxx
+   - [ ] Componente de autocomplete no frontend
+   - [ ] Busca enquanto digita (debounced)
+
+3. UI DE GERENCIAMENTO DE MEMBROS (0% implementado):
+
+   WORKSPACE:
+   - [ ] Modal "Membros do Workspace"
+   - [ ] Lista de membros com avatares e roles
+   - [ ] Botão para adicionar membro (abre busca)
+   - [ ] Dropdown para alterar role (ADMIN/MEMBER)
+   - [ ] Botão para remover membro
+   - [ ] Indicador "Você" no usuário atual
+   - [ ] Botão "Sair do workspace" para membros
+
+   BOARD:
+   - [ ] Modal "Membros do Board"
+   - [ ] Lista de membros com avatares e roles
+   - [ ] Botão para adicionar membro (abre busca)
+   - [ ] Dropdown para alterar role (ADMIN/MEMBER/OBSERVER)
+   - [ ] Botão para remover membro
+   - [ ] Botão "Sair do board" para membros
+
+4. EXIBIÇÃO VISUAL (0% implementado):
+   - [ ] Avatares de membros no header do workspace
+   - [ ] Avatares de membros no header do board
+   - [ ] Contador de membros
+   - [ ] Tooltip com nome ao hover no avatar
+   - [ ] UI diferenciada para Owner/Admin
+   - [ ] Badge de role visível
+
+5. RECURSOS AVANÇADOS (opcional):
+   - [ ] Transferir ownership do workspace
+   - [ ] Transferir ownership do board
+   - [ ] Adicionar múltiplos membros de uma vez
+   - [ ] Copiar link de convite para clipboard
+   - [ ] Histórico de convites enviados
+   - [ ] Notificação de novo convite
+
+═══════════════════════════════════════════════════════════════════════
+  📊 PRIORIDADE DE IMPLEMENTAÇÃO
+═══════════════════════════════════════════════════════════════════════
+
+ORDEM RECOMENDADA:
+
+1️⃣ ALTA PRIORIDADE (implementar primeiro):
+   [ ] Busca de usuários (backend + frontend)
+       - Criar GET /api/users/search?email=
+       - Criar componente UserSearchDropdown.tsx
+
+   [ ] UI de membros de workspace
+       - Criar WorkspaceMembersModal.tsx
+       - Adicionar botão no WorkspacePage
+       - Implementar adicionar/remover membros
+
+   [ ] UI de membros de board
+       - Criar BoardMembersModal.tsx
+       - Adicionar botão no BoardPage header
+       - Implementar adicionar/remover membros
+
+2️⃣ MÉDIA PRIORIDADE (depois do básico):
+   [ ] Sistema de convites por email
+       - Adicionar model Invitation ao schema.prisma
+       - Criar invitation.controller.ts e routes
+       - Integrar serviço de email (nodemailer)
+       - UI para enviar/aceitar convites
+
+   [ ] Exibição de membros no header
+       - Avatares no workspace header
+       - Avatares no board header
+       - Tooltip com informações
+
+3️⃣ BAIXA PRIORIDADE (polish):
+   [ ] Links de convite compartilháveis
+   [ ] Transferir ownership
+   [ ] Bulk operations
+   [ ] Histórico de convites
+
+═══════════════════════════════════════════════════════════════════════
+  💻 CÓDIGO NECESSÁRIO
+═══════════════════════════════════════════════════════════════════════
+
+BACKEND:
+
+1. user.controller.ts (CRIAR):
+   - GET /api/users/search?email=xxx
+   - GET /api/users/search?name=xxx
+   - Retornar: id, name, email, avatarUrl
+
+2. invitation.controller.ts (CRIAR):
+   - POST /api/workspaces/:id/invite (enviar convite)
+   - POST /api/boards/:id/invite (enviar convite)
+   - POST /api/invitations/:token/accept
+   - POST /api/invitations/:token/decline
+   - GET /api/invitations (listar pendentes)
+   - DELETE /api/invitations/:id
+
+3. schema.prisma (ADICIONAR):
+   model Invitation {
+     id          String   @id @default(uuid())
+     email       String
+     token       String   @unique
+     type        String   // WORKSPACE ou BOARD
+     workspaceId String?
+     boardId     String?
+     role        String   // ADMIN, MEMBER, OBSERVER
+     invitedBy   String
+     expiresAt   DateTime
+     status      String   // PENDING, ACCEPTED, DECLINED
+     createdAt   DateTime @default(now())
+   }
+
+FRONTEND:
+
+1. userService.ts (CRIAR):
+   - searchUsers(query: string)
+
+2. invitationService.ts (CRIAR):
+   - sendInvitation(type, id, email, role)
+   - acceptInvitation(token)
+   - declineInvitation(token)
+   - getMyInvitations()
+
+3. UserSearchDropdown.tsx (CRIAR):
+   - Input com busca
+   - Lista de resultados
+   - Debounce de 300ms
+   - Callback ao selecionar
+
+4. WorkspaceMembersModal.tsx (CRIAR):
+   - Lista de membros
+   - Botão adicionar
+   - Dropdown de role
+   - Botão remover
+
+5. BoardMembersModal.tsx (CRIAR):
+   - Similar ao workspace
+   - 3 roles em vez de 2
+
+═══════════════════════════════════════════════════════════════════════
+  📝 NOTAS IMPORTANTES
+═══════════════════════════════════════════════════════════════════════
+
+- Backend de permissões está PERFEITO ✅
+- Apenas falta criar UIs e sistema de convites
+- Não mexer nas verificações de permissão existentes
+- Manter consistência com design atual
+- Usar mesmos padrões de modal do projeto
+
+PROBLEMA ATUAL:
+Para adicionar alguém a um workspace/board, é necessário saber o UUID
+exato do usuário, o que é impraticável. Não há UI para isso.
+
+SOLUÇÃO:
+Implementar busca por email + modais de gerenciamento + convites.
+
+═══════════════════════════════════════════════════════════════════════
+  ⏰ ESTIMATIVA DE TEMPO
+═══════════════════════════════════════════════════════════════════════
+
+Busca de usuários:        30-40 minutos
+UI membros workspace:     1-1.5 horas
+UI membros board:         1-1.5 horas
+Sistema de convites:      2-3 horas
+Links compartilháveis:    1 hora
+Polish e testes:          1 hora
+
+TOTAL: 6-8 horas
+
+═══════════════════════════════════════════════════════════════════════
+Fim do documento
+═══════════════════════════════════════════════════════════════════════

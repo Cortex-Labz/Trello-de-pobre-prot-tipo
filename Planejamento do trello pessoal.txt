@@ -1,0 +1,495 @@
+Planejamento Completo - Clone do Trello
+
+  1. STACK TECNOLÓGICA RECOMENDADA
+
+  Backend:
+  - Node.js + Express (ou NestJS para maior estrutura)
+  - PostgreSQL (banco relacional para integridade dos dados)
+  - Prisma ORM (ou TypeORM)
+  - Socket.io (atualizações em tempo real)
+  - JWT (autenticação)
+  - Redis (cache e sessões)
+  - AWS S3 / Cloudinary (armazenamento de anexos)
+
+  Frontend:
+  - React + TypeScript
+  - React Beautiful DnD (drag and drop)
+  - Tailwind CSS (ou Material-UI)
+  - React Query (gerenciamento de estado servidor)
+  - Zustand (estado global)
+  - Socket.io Client (tempo real)
+  - React Router (navegação)
+
+  ---
+  2. FEATURES PRINCIPAIS
+
+  Nível 1 - Core (Essencial):
+  - ✓ Autenticação (registro, login, recuperação de senha)
+  - ✓ Workspaces (espaços de trabalho)
+  - ✓ Boards (quadros)
+  - ✓ Lists (listas)
+  - ✓ Cards (cartões)
+  - ✓ Drag & Drop (cards entre listas, listas entre posições)
+  - ✓ Membros (adicionar/remover do board)
+
+  Nível 2 - Funcionalidades dos Cards:
+  - ✓ Descrição (markdown)
+  - ✓ Labels/Etiquetas (coloridas, personalizáveis)
+  - ✓ Checklists (com itens marcáveis)
+  - ✓ Due Date (data de vencimento + notificações)
+  - ✓ Anexos (upload de arquivos)
+  - ✓ Comentários (com menções @usuario)
+  - ✓ Atividades/Histórico (log de mudanças)
+  - ✓ Assignees (atribuir membros ao card)
+  - ✓ Cover (imagem de capa)
+
+  Nível 3 - Colaboração:
+  - ✓ Permissões (Admin, Membro, Observador)
+  - ✓ Convites por email
+  - ✓ Notificações em tempo real
+  - ✓ Menções em comentários
+  - ✓ Observar cards (watch)
+
+  Nível 4 - Produtividade:
+  - ✓ Pesquisa global (cards, boards)
+  - ✓ Filtros (por membro, label, due date)
+  - ✓ Arquivar/Desarquivar (cards e listas)
+  - ✓ Templates de boards
+  - ✓ Copiar boards/cards
+  - ✓ Calendário (visualização de due dates)
+
+  Nível 5 - Extras:
+  - ✓ Background customizável do board
+  - ✓ Atalhos de teclado
+  - ✓ Exportar board (JSON/CSV)
+  - ✓ Automações básicas (Butler-like)
+  - ✓ Modo escuro
+
+  ---
+  3. ESTRUTURA DO BANCO DE DADOS
+
+  -- USUÁRIOS E AUTENTICAÇÃO
+  users
+    - id (UUID)
+    - email (unique)
+    - password_hash
+    - name
+    - avatar_url
+    - created_at
+    - updated_at
+
+  -- WORKSPACES
+  workspaces
+    - id (UUID)
+    - name
+    - description
+    - owner_id (FK users)
+    - created_at
+    - updated_at
+
+  workspace_members
+    - id (UUID)
+    - workspace_id (FK workspaces)
+    - user_id (FK users)
+    - role (ADMIN, MEMBER)
+    - joined_at
+
+  -- BOARDS
+  boards
+    - id (UUID)
+    - workspace_id (FK workspaces)
+    - name
+    - description
+    - background_color
+    - background_image_url
+    - visibility (PRIVATE, WORKSPACE, PUBLIC)
+    - is_archived
+    - created_at
+    - updated_at
+
+  board_members
+    - id (UUID)
+    - board_id (FK boards)
+    - user_id (FK users)
+    - role (ADMIN, MEMBER, OBSERVER)
+    - added_at
+
+  -- LISTS
+  lists
+    - id (UUID)
+    - board_id (FK boards)
+    - title
+    - position (integer para ordenação)
+    - is_archived
+    - created_at
+    - updated_at
+
+  -- CARDS
+  cards
+    - id (UUID)
+    - list_id (FK lists)
+    - title
+    - description (text)
+    - position (integer)
+    - due_date
+    - is_completed
+    - cover_url
+    - is_archived
+    - created_by (FK users)
+    - created_at
+    - updated_at
+
+  card_members
+    - id (UUID)
+    - card_id (FK cards)
+    - user_id (FK users)
+    - assigned_at
+
+  -- LABELS
+  labels
+    - id (UUID)
+    - board_id (FK boards)
+    - name
+    - color
+
+  card_labels
+    - card_id (FK cards)
+    - label_id (FK labels)
+
+  -- CHECKLISTS
+  checklists
+    - id (UUID)
+    - card_id (FK cards)
+    - title
+    - position
+    - created_at
+
+  checklist_items
+    - id (UUID)
+    - checklist_id (FK checklists)
+    - title
+    - is_completed
+    - position
+    - created_at
+    - updated_at
+
+  -- COMENTÁRIOS
+  comments
+    - id (UUID)
+    - card_id (FK cards)
+    - user_id (FK users)
+    - content (text)
+    - created_at
+    - updated_at
+
+  -- ATTACHMENTS
+  attachments
+    - id (UUID)
+    - card_id (FK cards)
+    - name
+    - url
+    - file_size
+    - mime_type
+    - uploaded_by (FK users)
+    - uploaded_at
+
+  -- ATIVIDADES (LOG)
+  activities
+    - id (UUID)
+    - board_id (FK boards)
+    - card_id (FK cards, nullable)
+    - user_id (FK users)
+    - action_type (CREATED, UPDATED, MOVED, ARCHIVED, etc)
+    - details (JSONB)
+    - created_at
+
+  -- NOTIFICAÇÕES
+  notifications
+    - id (UUID)
+    - user_id (FK users)
+    - type (MENTION, ASSIGNMENT, DUE_DATE, etc)
+    - content
+    - related_card_id (FK cards, nullable)
+    - is_read
+    - created_at
+
+  ---
+  4. ENDPOINTS DA API (Backend)
+
+  AUTH
+  POST   /api/auth/register
+  POST   /api/auth/login
+  POST   /api/auth/logout
+  POST   /api/auth/refresh-token
+  POST   /api/auth/forgot-password
+  POST   /api/auth/reset-password
+
+  USERS
+  GET    /api/users/me
+  PUT    /api/users/me
+  GET    /api/users/:id
+  GET    /api/users/search?q=
+
+  WORKSPACES
+  GET    /api/workspaces
+  POST   /api/workspaces
+  GET    /api/workspaces/:id
+  PUT    /api/workspaces/:id
+  DELETE /api/workspaces/:id
+  GET    /api/workspaces/:id/members
+  POST   /api/workspaces/:id/members
+  DELETE /api/workspaces/:id/members/:userId
+
+  BOARDS
+  GET    /api/boards
+  POST   /api/boards
+  GET    /api/boards/:id (inclui lists, cards, members)
+  PUT    /api/boards/:id
+  DELETE /api/boards/:id
+  POST   /api/boards/:id/archive
+  POST   /api/boards/:id/duplicate
+  GET    /api/boards/:id/members
+  POST   /api/boards/:id/members
+  PUT    /api/boards/:id/members/:userId (atualizar role)
+  DELETE /api/boards/:id/members/:userId
+
+  LISTS
+  POST   /api/boards/:boardId/lists
+  PUT    /api/lists/:id
+  DELETE /api/lists/:id
+  POST   /api/lists/:id/archive
+  PUT    /api/lists/reorder (mudar posição)
+
+  CARDS
+  POST   /api/lists/:listId/cards
+  GET    /api/cards/:id
+  PUT    /api/cards/:id
+  DELETE /api/cards/:id
+  POST   /api/cards/:id/archive
+  PUT    /api/cards/:id/move (mover entre listas)
+  PUT    /api/cards/reorder
+  POST   /api/cards/:id/duplicate
+  GET    /api/cards/:id/members
+  POST   /api/cards/:id/members
+  DELETE /api/cards/:id/members/:userId
+
+  LABELS
+  GET    /api/boards/:boardId/labels
+  POST   /api/boards/:boardId/labels
+  PUT    /api/labels/:id
+  DELETE /api/labels/:id
+  POST   /api/cards/:cardId/labels/:labelId
+  DELETE /api/cards/:cardId/labels/:labelId
+
+  CHECKLISTS
+  POST   /api/cards/:cardId/checklists
+  PUT    /api/checklists/:id
+  DELETE /api/checklists/:id
+  POST   /api/checklists/:id/items
+  PUT    /api/checklists/items/:id
+  DELETE /api/checklists/items/:id
+
+  COMMENTS
+  GET    /api/cards/:cardId/comments
+  POST   /api/cards/:cardId/comments
+  PUT    /api/comments/:id
+  DELETE /api/comments/:id
+
+  ATTACHMENTS
+  POST   /api/cards/:cardId/attachments
+  DELETE /api/attachments/:id
+
+  ACTIVITIES
+  GET    /api/boards/:boardId/activities
+  GET    /api/cards/:cardId/activities
+
+  NOTIFICATIONS
+  GET    /api/notifications
+  PUT    /api/notifications/:id/read
+  PUT    /api/notifications/read-all
+
+  SEARCH
+  GET    /api/search?q=&type=&boardId=
+
+  WEBSOCKET EVENTS
+  - board:updated
+  - card:created
+  - card:updated
+  - card:moved
+  - card:deleted
+  - comment:created
+  - notification:new
+
+  ---
+  5. COMPONENTES FRONTEND
+
+  src/
+  ├── components/
+  │   ├── auth/
+  │   │   ├── LoginForm
+  │   │   ├── RegisterForm
+  │   │   └── ForgotPasswordForm
+  │   ├── workspace/
+  │   │   ├── WorkspaceList
+  │   │   ├── WorkspaceCard
+  │   │   └── WorkspaceSettings
+  │   ├── board/
+  │   │   ├── BoardList
+  │   │   ├── BoardCard
+  │   │   ├── BoardHeader
+  │   │   ├── BoardBackground
+  │   │   └── BoardSettings
+  │   ├── list/
+  │   │   ├── List
+  │   │   ├── ListHeader
+  │   │   ├── AddList
+  │   │   └── ListMenu
+  │   ├── card/
+  │   │   ├── Card
+  │   │   ├── CardModal (detalhes completos)
+  │   │   ├── CardDescription
+  │   │   ├── CardMembers
+  │   │   ├── CardLabels
+  │   │   ├── CardDueDate
+  │   │   ├── CardAttachments
+  │   │   ├── CardComments
+  │   │   ├── CardActivity
+  │   │   └── CardActions (sidebar)
+  │   ├── checklist/
+  │   │   ├── Checklist
+  │   │   └── ChecklistItem
+  │   ├── common/
+  │   │   ├── Avatar
+  │   │   ├── Button
+  │   │   ├── Modal
+  │   │   ├── Dropdown
+  │   │   ├── DatePicker
+  │   │   ├── ColorPicker
+  │   │   ├── SearchBar
+  │   │   └── Notification
+  │   └── layout/
+  │       ├── Header
+  │       ├── Sidebar
+  │       └── NotificationCenter
+  ├── pages/
+  │   ├── Login
+  │   ├── Register
+  │   ├── Dashboard (workspaces)
+  │   ├── WorkspacePage (boards do workspace)
+  │   ├── BoardPage (o board completo)
+  │   ├── ProfilePage
+  │   └── NotFoundPage
+  ├── hooks/
+  │   ├── useAuth
+  │   ├── useBoard
+  │   ├── useCards
+  │   ├── useDragDrop
+  │   ├── useWebSocket
+  │   └── useNotifications
+  └── services/
+      ├── api.ts
+      ├── auth.ts
+      ├── websocket.ts
+      └── storage.ts
+
+  ---
+  6. FASES DE IMPLEMENTAÇÃO
+
+  ═══════════════════════════════════════════════════════════════════════
+  ✅ FASE 1 - Fundação (2-3 semanas) - COMPLETA 100%
+  ═══════════════════════════════════════════════════════════════════════
+  ✅ 1. Setup do projeto (backend + frontend)
+  ✅ 2. Autenticação completa
+  ✅ 3. Database schema + migrations
+  ✅ 4. CRUD básico: Workspaces, Boards, Lists, Cards
+  ✅ 5. UI básica sem drag & drop
+
+  ═══════════════════════════════════════════════════════════════════════
+  ✅ FASE 2 - Core Features (3-4 semanas) - COMPLETA 100%
+  ═══════════════════════════════════════════════════════════════════════
+  ✅ 1. Drag & Drop (cards e lists) - @hello-pangea/dnd
+  ✅ 2. Sistema de membros e permissões (backend completo, UI parcial)
+  ✅ 3. Labels (CRUD completo com color picker)
+  ✅ 4. WebSocket para atualizações em tempo real (Socket.io)
+  ✅ 5. Card modal completo (descrição, dates, cover, members)
+
+  ═══════════════════════════════════════════════════════════════════════
+  ✅ FASE 3 - Colaboração (2-3 semanas) - COMPLETA 100%
+  ═══════════════════════════════════════════════════════════════════════
+  ✅ 1. Checklists (múltiplas por card, progress bar)
+  ✅ 2. Comentários e menções (@usuario com notificações)
+  ✅ 3. Anexos (upload de arquivos, preview de imagens)
+  ✅ 4. Atividades/Histórico (log completo de ações)
+  ✅ 5. Notificações (tempo real com WebSocket + dropdown UI + toast)
+       - Tipos: MENTION, COMMENT, ASSIGNMENT, DUE_DATE, CARD_MOVED
+       - Notificação ao ser mencionado em comentário
+       - Notificação ao ser atribuído a um card
+       - Navegação para card ao clicar na notificação
+       - Badge de não lidas
+       - Marcar como lida/todas como lidas
+
+  ═══════════════════════════════════════════════════════════════════════
+  ❌ FASE 3.5 - Sistema de Convites e Gerenciamento de Membros (1-2 semanas)
+  ═══════════════════════════════════════════════════════════════════════
+  STATUS: 30% - Backend de permissões completo, UI faltando
+
+  ✅ Backend de Permissões:
+     ✅ Roles de workspace (ADMIN, MEMBER)
+     ✅ Roles de board (ADMIN, MEMBER, OBSERVER)
+     ✅ Endpoints de adicionar/remover membros
+     ✅ Endpoints de alterar roles
+     ✅ Verificações de permissão em controllers
+
+  ❌ Sistema de Convites (0%):
+     ❌ 1. Busca de usuários (endpoint GET /api/users/search?email=)
+     ❌ 2. UI de gerenciamento de membros de workspace (modal com lista)
+     ❌ 3. UI de gerenciamento de membros de board (modal com lista)
+     ❌ 4. Componente de autocomplete para buscar usuários
+     ❌ 5. Sistema de convites por email (com tokens e links)
+     ❌ 6. Geração de links de convite compartilháveis
+     ❌ 7. Aceitar/recusar convites
+     ❌ 8. Histórico de convites enviados/aceitos
+     ❌ 9. Exibição de membros no header (avatares)
+     ❌ 10. UI para alterar roles de membros (dropdowns)
+
+  📝 OBSERVAÇÃO: Backend de permissões está 100% completo (roles, verificações)
+                 Faltam apenas: sistema de convites + UIs de gerenciamento
+  📄 Ver detalhes em: PENDENTE_SISTEMA_CONVITES.txt
+
+  ═══════════════════════════════════════════════════════════════════════
+  ❌ FASE 4 - Produtividade (2 semanas) - PENDENTE 0%
+  ═══════════════════════════════════════════════════════════════════════
+  ❌ 1. Pesquisa global (cards, boards)
+  ❌ 2. Filtros (por membro, label, due date)
+  ❌ 3. Arquivar/desarquivar (cards e listas)
+     📝 Backend já tem endpoints, falta UI
+  ❌ 4. Templates de boards
+  ❌ 5. Copiar boards/cards
+     📝 Backend já tem /api/boards/:id/duplicate
+  ❌ 6. Calendário (visualização de due dates)
+
+  ═══════════════════════════════════════════════════════════════════════
+  ❌ FASE 5 - Polish (1-2 semanas) - PENDENTE 20%
+  ═══════════════════════════════════════════════════════════════════════
+  ✅ 1. Background customizável do board (10 cores + gradientes)
+  ❌ 2. Atalhos de teclado
+  ✅ 3. Modo escuro (dark mode toggle completo)
+  ❌ 4. Otimizações de performance
+  ❌ 5. Testes (unitários e integração)
+  ❌ 6. Exportar board (JSON/CSV)
+  ❌ 7. Automações básicas (Butler-like)
+
+  ═══════════════════════════════════════════════════════════════════════
+  📊 PROGRESSO TOTAL DO PROJETO
+  ═══════════════════════════════════════════════════════════════════════
+
+  FASE 1:   ████████████████████ 100% ✅ COMPLETA
+  FASE 2:   ████████████████████ 100% ✅ COMPLETA
+  FASE 3:   ████████████████████ 100% ✅ COMPLETA
+  FASE 3.5: ██████░░░░░░░░░░░░░░  30% ⚠️  EM PROGRESSO (backend pronto)
+  FASE 4:   ░░░░░░░░░░░░░░░░░░░░   0% ❌ PENDENTE
+  FASE 5:   ████░░░░░░░░░░░░░░░░  20% ⚠️  PARCIAL
+
+  TOTAL GERAL: ████████████████░░░░ 75% 🚀 MVP FUNCIONAL!
+
+  ESTIMADO PARA 100%: 3-4 semanas de trabalho adicional
