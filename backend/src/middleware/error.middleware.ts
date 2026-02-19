@@ -13,9 +13,9 @@ export class AppError extends Error {
 
 export function errorHandler(
   err: Error | AppError,
-  req: Request,
+  _req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): void {
   if (err instanceof AppError) {
     res.status(err.statusCode).json({

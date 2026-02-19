@@ -7,7 +7,7 @@ export const notificationService = {
     mentionedUserId: string,
     mentioningUserId: string,
     cardId: string,
-    commentContent: string
+    _commentContent: string
   ) {
     try {
       // Não notificar se o usuário mencionou a si mesmo
@@ -99,7 +99,7 @@ export const notificationService = {
     cardId: string,
     commentingUserId: string,
     cardTitle: string,
-    commentContent: string
+    _commentContent: string
   ) {
     try {
       // Buscar membros do card
@@ -151,7 +151,7 @@ export const notificationService = {
     userId: string,
     cardId: string,
     cardTitle: string,
-    dueDate: Date
+    _dueDate: Date
   ) {
     try {
       const notification = await prisma.notification.create({
@@ -284,7 +284,7 @@ export const notificationService = {
   // Criar notificação de exclusão de card (para membros do board)
   async createCardDeletedNotification(
     boardId: string,
-    cardId: string,
+    _cardId: string,
     deletingUserId: string,
     cardTitle: string
   ) {

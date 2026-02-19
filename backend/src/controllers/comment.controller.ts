@@ -121,7 +121,7 @@ export async function createComment(req: AuthRequest, res: Response): Promise<vo
 
     if (mentions) {
       // Buscar usuários mencionados pelo nome
-      const usernames = mentions.map(m => m.slice(1)); // Remove @
+      const usernames = mentions.map((m: string) => m.slice(1)); // Remove @
       const users = await prisma.user.findMany({
         where: {
           name: {

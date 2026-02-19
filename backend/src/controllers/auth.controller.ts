@@ -6,7 +6,7 @@ import { prisma } from '../utils/prisma';
 import { hashPassword, comparePassword } from '../utils/password';
 import { generateToken } from '../utils/jwt';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { AppError } from '../middleware/error.middleware';
+import type { AppError } from '../middleware/error.middleware';
 
 // POST /api/auth/register
 export async function register(req: AuthRequest, res: Response): Promise<void> {

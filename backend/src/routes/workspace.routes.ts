@@ -99,15 +99,15 @@ router.post(
     body('name').trim().notEmpty(),
     body('description').optional().trim(),
   ],
-  (req, res) => {
+  (req: any, res: any) => {
     req.body.workspaceId = req.params.id;
-    return createBoard(req as any, res);
+    return createBoard(req, res);
   }
 );
 
 // DELETE /api/workspaces/:workspaceId/boards/:boardId
-router.delete('/:workspaceId/boards/:boardId', (req, res) => {
-  req.params.id = req.params.boardId;
+router.delete('/:workspaceId/boards/:boardId', (req: any, res: any) => {
+  (req.params as any).id = req.params.boardId;
   return deleteBoard(req as any, res);
 });
 
