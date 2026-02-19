@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { validationResult } from 'express-validator';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { io } from '../index';
+import { getIO } from '../utils/socket';
 import { emitBoardUpdate } from '../services/websocket.service';
 import { activityService } from '../services/activityService';
 import { notificationService } from '../services/notificationService';
@@ -186,7 +186,7 @@ export async function createCard(req: AuthRequest, res: Response): Promise<void>
       list.title
     ).catch(console.error);
 
-    emitBoardUpdate(io, list.boardId, 'card:created', {
+    emitBoardUpdate(getIO(), list.boardId, 'card:created', {
       ...card,
       listId,
     });
@@ -274,7 +274,7 @@ export async function updateCard(req: AuthRequest, res: Response): Promise<void>
       );
     }
 
-    emitBoardUpdate(io, card.list.boardId, 'card:updated', updatedCard);
+    emitBoardUpdate(getIO(), card.list.boardId, 'card:updated', updatedCard);
 
     res.json({ card: updatedCard });
   } catch (error) {
@@ -338,7 +338,7 @@ export async function deleteCard(req: AuthRequest, res: Response): Promise<void>
       where: { id },
     });
 
-    emitBoardUpdate(io, card.list.boardId, 'card:deleted', { id });
+    emitBoardUpdate(getIO(), card.list.boardId, 'card:deleted', { id });
 
     res.json({ message: 'Card deleted successfully' });
   } catch (error) {
@@ -466,7 +466,7 @@ export async function moveCard(req: AuthRequest, res: Response): Promise<void> {
       ).catch(console.error);
     }
 
-    emitBoardUpdate(io, card.list.boardId, 'card:moved', updatedCard);
+    emitBoardUpdate(getIO(), card.list.boardId, 'card:moved', updatedCard);
 
     res.json({ card: updatedCard });
   } catch (error) {
@@ -527,7 +527,7 @@ export async function archiveCard(req: AuthRequest, res: Response): Promise<void
       );
     }
 
-    emitBoardUpdate(io, card.list.boardId, 'card:archived', updatedCard);
+    emitBoardUpdate(getIO(), card.list.boardId, 'card:archived', updatedCard);
 
     res.json({ card: updatedCard });
   } catch (error) {
@@ -583,7 +583,7 @@ export async function duplicateCard(req: AuthRequest, res: Response): Promise<vo
       },
     });
 
-    emitBoardUpdate(io, originalCard.list.boardId, 'card:created', newCard);
+    emitBoardUpdate(getIO(), originalCard.list.boardId, 'card:created', newCard);
 
     res.status(201).json({ card: newCard });
   } catch (error) {
@@ -664,7 +664,7 @@ export async function addCardMember(req: AuthRequest, res: Response): Promise<vo
       card.title
     ).catch(console.error);
 
-    emitBoardUpdate(io, card.list.boardId, 'card:member:added', {
+    emitBoardUpdate(getIO(), card.list.boardId, 'card:member:added', {
       cardId: id,
       member,
     });
@@ -736,7 +736,7 @@ export async function removeCardMember(req: AuthRequest, res: Response): Promise
       removedUser?.name || 'Unknown'
     );
 
-    emitBoardUpdate(io, card.list.boardId, 'card:member:removed', {
+    emitBoardUpdate(getIO(), card.list.boardId, 'card:member:removed', {
       cardId: id,
       userId,
     });
@@ -926,7 +926,7 @@ export async function setCoverImage(req: AuthRequest, res: Response): Promise<vo
     );
 
     // Emit WebSocket update
-    emitBoardUpdate(io, card.list.boardId, 'card:updated', updatedCard);
+    emitBoardUpdate(getIO(), card.list.boardId, 'card:updated', updatedCard);
 
     res.json(updatedCard);
   } catch (error) {

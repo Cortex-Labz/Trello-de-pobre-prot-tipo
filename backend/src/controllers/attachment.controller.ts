@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { validationResult } from 'express-validator';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { io } from '../index';
+import { getIO } from '../utils/socket';
 import { emitBoardUpdate } from '../services/websocket.service';
 import { activityService } from '../services/activityService';
 
@@ -96,7 +96,7 @@ export async function uploadAttachment(req: AuthRequest, res: Response): Promise
     );
 
     // Emit WebSocket update
-    emitBoardUpdate(io, card.list.boardId, 'card:updated', {
+    emitBoardUpdate(getIO(), card.list.boardId, 'card:updated', {
       cardId: card.id,
       attachment,
     });
@@ -174,7 +174,7 @@ export async function deleteAttachment(req: AuthRequest, res: Response): Promise
     });
 
     // Emit WebSocket update
-    emitBoardUpdate(io, attachment.card.list.boardId, 'card:updated', {
+    emitBoardUpdate(getIO(), attachment.card.list.boardId, 'card:updated', {
       cardId: attachment.cardId,
       deletedAttachmentId: id,
     });

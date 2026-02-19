@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { validationResult } from 'express-validator';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { io } from '../index';
+import { getIO } from '../utils/socket';
 import { emitBoardUpdate } from '../services/websocket.service';
 import { activityService } from '../services/activityService';
 
@@ -47,7 +47,7 @@ export async function createList(req: AuthRequest, res: Response): Promise<void>
 
     activityService.logListCreated(boardId, req.userId!, title).catch(console.error);
 
-    emitBoardUpdate(io, boardId, 'list:created', list);
+    emitBoardUpdate(getIO(), boardId, 'list:created', list);
 
     res.status(201).json({ list });
   } catch (error) {
@@ -104,7 +104,7 @@ export async function updateList(req: AuthRequest, res: Response): Promise<void>
       },
     });
 
-    emitBoardUpdate(io, list.board.id, 'list:updated', updatedList);
+    emitBoardUpdate(getIO(), list.board.id, 'list:updated', updatedList);
 
     res.json({ list: updatedList });
   } catch (error) {
@@ -152,7 +152,7 @@ export async function deleteList(req: AuthRequest, res: Response): Promise<void>
       where: { id },
     });
 
-    emitBoardUpdate(io, list.board.id, 'list:deleted', { id });
+    emitBoardUpdate(getIO(), list.board.id, 'list:deleted', { id });
 
     res.json({ message: 'List deleted successfully' });
   } catch (error) {
@@ -201,7 +201,7 @@ export async function archiveList(req: AuthRequest, res: Response): Promise<void
       },
     });
 
-    emitBoardUpdate(io, list.board.id, 'list:archived', updatedList);
+    emitBoardUpdate(getIO(), list.board.id, 'list:archived', updatedList);
 
     res.json({ list: updatedList });
   } catch (error) {

@@ -1,6 +1,9 @@
+import dotenv from 'dotenv';
+// Load environment variables BEFORE other imports
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import path from 'path';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -19,9 +22,7 @@ import notificationRoutes from './routes/notification.routes';
 import invitationRoutes from './routes/invitation.routes';
 import { errorHandler } from './middleware/error.middleware';
 import { initializeWebSocket } from './services/websocket.service';
-
-// Load environment variables
-dotenv.config();
+import { setIO } from './utils/socket';
 
 const app = express();
 const httpServer = createServer(app);
@@ -32,6 +33,7 @@ const io = new Server(httpServer, {
     credentials: true,
   },
 });
+setIO(io);
 
 // Middleware - Allow all origins for development
 app.use(cors({
@@ -79,4 +81,3 @@ httpServer.listen(PORT, () => {
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
-export { io };

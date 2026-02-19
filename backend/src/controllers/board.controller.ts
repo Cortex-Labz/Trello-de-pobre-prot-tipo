@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { validationResult } from 'express-validator';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { io } from '../index';
+import { getIO } from '../utils/socket';
 import { emitBoardUpdate } from '../services/websocket.service';
 import { activityService } from '../services/activityService';
 
@@ -331,7 +331,7 @@ export async function updateBoard(req: AuthRequest, res: Response): Promise<void
     });
 
     // Emit WebSocket event
-    emitBoardUpdate(io, id, 'board:updated', updatedBoard);
+    emitBoardUpdate(getIO(), id, 'board:updated', updatedBoard);
 
     res.json({ board: updatedBoard });
   } catch (error) {
@@ -538,7 +538,7 @@ export async function addBoardMember(req: AuthRequest, res: Response): Promise<v
 
     activityService.logBoardMemberAdded(id, req.userId!, member.user.name, role).catch(console.error);
 
-    emitBoardUpdate(io, id, 'board:member:added', member);
+    emitBoardUpdate(getIO(), id, 'board:member:added', member);
 
     res.status(201).json({ member });
   } catch (error: any) {
@@ -603,7 +603,7 @@ export async function updateBoardMemberRole(
       },
     });
 
-    emitBoardUpdate(io, id, 'board:member:updated', member);
+    emitBoardUpdate(getIO(), id, 'board:member:updated', member);
 
     res.json({ member });
   } catch (error) {
@@ -651,7 +651,7 @@ export async function removeBoardMember(req: AuthRequest, res: Response): Promis
       },
     });
 
-    emitBoardUpdate(io, id, 'board:member:removed', { userId });
+    emitBoardUpdate(getIO(), id, 'board:member:removed', { userId });
 
     res.json({ message: 'Member removed successfully' });
   } catch (error) {

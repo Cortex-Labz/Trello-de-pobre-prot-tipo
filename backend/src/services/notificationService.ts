@@ -1,5 +1,5 @@
 import { prisma } from '../utils/prisma';
-import { io } from '../index';
+import { getIO } from '../utils/socket';
 
 export const notificationService = {
   // Criar notificação de menção
@@ -43,7 +43,7 @@ export const notificationService = {
       });
 
       // Emitir evento WebSocket
-      io.to(`user:${mentionedUserId}`).emit('notification', notification);
+      getIO().to(`user:${mentionedUserId}`).emit('notification', notification);
 
       return notification;
     } catch (error) {
@@ -85,7 +85,7 @@ export const notificationService = {
       });
 
       // Emitir evento WebSocket
-      io.to(`user:${assignedUserId}`).emit('notification', notification);
+      getIO().to(`user:${assignedUserId}`).emit('notification', notification);
 
       return notification;
     } catch (error) {
@@ -135,7 +135,7 @@ export const notificationService = {
           notifications.push(notification);
 
           // Emitir evento WebSocket
-          io.to(`user:${member.userId}`).emit('notification', notification);
+          getIO().to(`user:${member.userId}`).emit('notification', notification);
         }
       }
 
@@ -165,7 +165,7 @@ export const notificationService = {
       });
 
       // Emitir evento WebSocket
-      io.to(`user:${userId}`).emit('notification', notification);
+      getIO().to(`user:${userId}`).emit('notification', notification);
 
       return notification;
     } catch (error) {
@@ -216,7 +216,7 @@ export const notificationService = {
           notifications.push(notification);
 
           // Emitir evento WebSocket
-          io.to(`user:${member.userId}`).emit('notification', notification);
+          getIO().to(`user:${member.userId}`).emit('notification', notification);
         }
       }
 
@@ -270,7 +270,7 @@ export const notificationService = {
           notifications.push(notification);
 
           // Emitir evento WebSocket
-          io.to(`user:${member.userId}`).emit('notification', notification);
+          getIO().to(`user:${member.userId}`).emit('notification', notification);
         }
       }
 
@@ -321,7 +321,7 @@ export const notificationService = {
           notifications.push(notification);
 
           // Emitir evento WebSocket
-          io.to(`user:${member.userId}`).emit('notification', notification);
+          getIO().to(`user:${member.userId}`).emit('notification', notification);
         }
       }
 

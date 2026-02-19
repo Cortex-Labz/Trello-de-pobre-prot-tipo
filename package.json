@@ -5,8 +5,7 @@
   "private": true,
   "workspaces": [
     "frontend",
-    "backend",
-    "shared"
+    "backend"
   ],
   "scripts": {
     "setup": "npm install && cd backend && node -e \"const fs=require('fs');if(!fs.existsSync('.env'))fs.copyFileSync('.env.example','.env')\" && npx prisma generate && npx prisma db push && cd ..",

@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { validationResult } from 'express-validator';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { io } from '../index';
+import { getIO } from '../utils/socket';
 import { emitBoardUpdate } from '../services/websocket.service';
 import { activityService } from '../services/activityService';
 
@@ -83,7 +83,7 @@ export async function createLabel(req: AuthRequest, res: Response): Promise<void
       },
     });
 
-    emitBoardUpdate(io, boardId, 'label:created', label);
+    emitBoardUpdate(getIO(), boardId, 'label:created', label);
 
     res.status(201).json({ label });
   } catch (error) {
@@ -134,7 +134,7 @@ export async function updateLabel(req: AuthRequest, res: Response): Promise<void
       },
     });
 
-    emitBoardUpdate(io, label.board.id, 'label:updated', updatedLabel);
+    emitBoardUpdate(getIO(), label.board.id, 'label:updated', updatedLabel);
 
     res.json({ label: updatedLabel });
   } catch (error) {
@@ -180,7 +180,7 @@ export async function deleteLabel(req: AuthRequest, res: Response): Promise<void
       where: { id },
     });
 
-    emitBoardUpdate(io, label.board.id, 'label:deleted', { id });
+    emitBoardUpdate(getIO(), label.board.id, 'label:deleted', { id });
 
     res.json({ message: 'Label deleted successfully' });
   } catch (error) {
@@ -244,7 +244,7 @@ export async function addLabelToCard(req: AuthRequest, res: Response): Promise<v
       );
     }
 
-    emitBoardUpdate(io, card.list.boardId, 'card:label:added', {
+    emitBoardUpdate(getIO(), card.list.boardId, 'card:label:added', {
       cardId,
       label,
     });
@@ -320,7 +320,7 @@ export async function removeLabelFromCard(
       );
     }
 
-    emitBoardUpdate(io, card.list.boardId, 'card:label:removed', {
+    emitBoardUpdate(getIO(), card.list.boardId, 'card:label:removed', {
       cardId,
       labelId,
     });
