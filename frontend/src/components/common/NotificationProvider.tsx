@@ -4,7 +4,7 @@ import { NotificationData } from '../../types/notification';
 import { useAuthStore } from '../../store/authStore';
 import { NotificationToastContainer } from './NotificationToast';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || (import.meta.env.PROD ? '' : 'http://localhost:5000');
 
 export default function NotificationProvider() {
   const [toastNotifications, setToastNotifications] = useState<NotificationData[]>([]);
