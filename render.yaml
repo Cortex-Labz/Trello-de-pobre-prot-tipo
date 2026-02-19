@@ -10,4 +10,4 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
-        value: file:./prisma/dev.db
+        sync: false  # Set manually in Render dashboard

@@ -1,12 +1,11 @@
-// Prisma Schema for VersatlyTask - SQLite Version
-// Based on the planning document
+// Prisma Schema for VersatlyTask - PostgreSQL Version
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
