@@ -1,7 +1,6 @@
 import { Response } from 'express';
 import { validationResult } from 'express-validator';
-import fs from 'fs';
-import path from 'path';
+
 import { prisma } from '../utils/prisma';
 import { hashPassword, comparePassword } from '../utils/password';
 import { generateToken } from '../utils/jwt';
@@ -227,42 +226,14 @@ export async function uploadAvatar(req: AuthRequest, res: Response): Promise<voi
 
     const { imageData } = req.body;
 
-    // Extract MIME type and raw base64 from data URL
-    const matches = imageData.match(/^data:(image\/\w+);base64,(.+)$/);
-    if (!matches) {
+    // Validate it's a valid image data URL
+    if (!imageData || !imageData.match(/^data:image\/\w+;base64,.+$/)) {
       res.status(400).json({ error: 'Formato de imagem inválido' });
       return;
     }
 
-    const mimeType = matches[1];
-    const base64Data = matches[2];
-
-    // Determine file extension from MIME type
-    const extensionMap: Record<string, string> = {
-      'image/png': '.png',
-      'image/jpeg': '.jpg',
-      'image/jpg': '.jpg',
-      'image/gif': '.gif',
-      'image/webp': '.webp',
-    };
-
-    const extension = extensionMap[mimeType];
-    if (!extension) {
-      res.status(400).json({ error: 'Tipo de imagem não suportado' });
-      return;
-    }
-
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = path.join(__dirname, '..', '..', 'uploads', 'avatars');
-    fs.mkdirSync(uploadsDir, { recursive: true });
-
-    // Write file
-    const fileName = `${req.userId}${extension}`;
-    const filePath = path.join(uploadsDir, fileName);
-    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
-
-    // Construct URL with cache-busting query parameter
-    const avatarUrl = `http://localhost:5000/uploads/avatars/${fileName}?t=${Date.now()}`;
+    // Store data URL directly in database (no filesystem needed)
+    const avatarUrl = imageData;
 
     // Update user in DB
     const user = await prisma.user.update({
