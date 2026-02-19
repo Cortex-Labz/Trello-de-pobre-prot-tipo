@@ -4,6 +4,7 @@ import { boardService } from '../services/boardService';
 import { cardService } from '../services/cardService';
 import { listService } from '../services/listService';
 import { Card, List } from '../types';
+import { useConfirmModal } from '../hooks/useConfirmModal';
 
 interface ArchivedItemsModalProps {
   boardId: string;
@@ -12,6 +13,7 @@ interface ArchivedItemsModalProps {
 
 export default function ArchivedItemsModal({ boardId, onClose }: ArchivedItemsModalProps) {
   const queryClient = useQueryClient();
+  const { confirm: confirmAction, ConfirmDialog } = useConfirmModal();
   const [activeTab, setActiveTab] = useState<'cards' | 'lists'>('cards');
 
   const { data, isLoading } = useQuery({
@@ -52,13 +54,13 @@ export default function ArchivedItemsModal({ boardId, onClose }: ArchivedItemsMo
   });
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(0, 0, 0, 0.6)' }}>
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ background: 'var(--overlay-bg)' }}>
       <div
         className="rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col"
         style={{
           background: 'var(--surface-primary)',
           backdropFilter: 'blur(20px)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          boxShadow: 'var(--shadow-lg)',
           border: '1px solid var(--border-color)',
           color: 'var(--text-primary)',
         }}
@@ -160,8 +162,14 @@ export default function ArchivedItemsModal({ boardId, onClose }: ArchivedItemsMo
                         Restaurar
                       </button>
                       <button
-                        onClick={() => {
-                          if (window.confirm('Tem certeza que deseja excluir permanentemente este card?')) {
+                        onClick={async () => {
+                          const confirmed = await confirmAction({
+                            title: 'Excluir permanentemente',
+                            message: 'Tem certeza que deseja excluir permanentemente este card? Esta acao nao pode ser desfeita.',
+                            confirmText: 'Excluir',
+                            variant: 'danger',
+                          });
+                          if (confirmed) {
                             deleteCardMutation.mutate(card.id);
                           }
                         }}
@@ -208,12 +216,14 @@ export default function ArchivedItemsModal({ boardId, onClose }: ArchivedItemsMo
                         Restaurar
                       </button>
                       <button
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              'Tem certeza que deseja excluir permanentemente esta lista e todos os seus cards?'
-                            )
-                          ) {
+                        onClick={async () => {
+                          const confirmed = await confirmAction({
+                            title: 'Excluir lista',
+                            message: 'Tem certeza que deseja excluir permanentemente esta lista e todos os seus cards?',
+                            confirmText: 'Excluir',
+                            variant: 'danger',
+                          });
+                          if (confirmed) {
                             deleteListMutation.mutate(list.id);
                           }
                         }}
@@ -234,6 +244,7 @@ export default function ArchivedItemsModal({ boardId, onClose }: ArchivedItemsMo
           )}
         </div>
       </div>
+      <ConfirmDialog />
     </div>
   );
 }

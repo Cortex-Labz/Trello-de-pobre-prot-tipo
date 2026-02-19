@@ -174,8 +174,62 @@ export const notificationService = {
     }
   },
 
-  // Criar notificação de movimentação de card
+  // Criar notificação de criação de card (para membros do board)
+  async createCardCreatedNotification(
+    boardId: string,
+    cardId: string,
+    creatorUserId: string,
+    cardTitle: string,
+    listName: string
+  ) {
+    try {
+      // Buscar membros do board
+      const boardMembers = await prisma.boardMember.findMany({
+        where: { boardId },
+        select: { userId: true },
+      });
+
+      const creatorUser = await prisma.user.findUnique({
+        where: { id: creatorUserId },
+        select: { name: true },
+      });
+
+      if (!creatorUser) {
+        return [];
+      }
+
+      const notifications = [];
+
+      // Criar notificação para cada membro (exceto quem criou)
+      for (const member of boardMembers) {
+        if (member.userId !== creatorUserId) {
+          const notification = await prisma.notification.create({
+            data: {
+              userId: member.userId,
+              type: 'CARD_CREATED',
+              content: `${creatorUser.name} criou o card "${cardTitle}" em ${listName}`,
+              relatedCardId: cardId,
+              isRead: false,
+            },
+          });
+
+          notifications.push(notification);
+
+          // Emitir evento WebSocket
+          io.to(`user:${member.userId}`).emit('notification', notification);
+        }
+      }
+
+      return notifications;
+    } catch (error) {
+      console.error('Error creating card created notifications:', error);
+      return [];
+    }
+  },
+
+  // Criar notificação de movimentação de card (para membros do board)
   async createCardMovedNotification(
+    boardId: string,
     cardId: string,
     movingUserId: string,
     cardTitle: string,
@@ -183,9 +237,9 @@ export const notificationService = {
     toList: string
   ) {
     try {
-      // Buscar membros do card
-      const cardMembers = await prisma.cardMember.findMany({
-        where: { cardId },
+      // Buscar membros do board (todos devem ser notificados)
+      const boardMembers = await prisma.boardMember.findMany({
+        where: { boardId },
         select: { userId: true },
       });
 
@@ -200,8 +254,8 @@ export const notificationService = {
 
       const notifications = [];
 
-      // Criar notificação para cada membro (exceto quem moveu)
-      for (const member of cardMembers) {
+      // Criar notificação para cada membro do board (exceto quem moveu)
+      for (const member of boardMembers) {
         if (member.userId !== movingUserId) {
           const notification = await prisma.notification.create({
             data: {
@@ -223,6 +277,57 @@ export const notificationService = {
       return notifications;
     } catch (error) {
       console.error('Error creating card moved notifications:', error);
+      return [];
+    }
+  },
+
+  // Criar notificação de exclusão de card (para membros do board)
+  async createCardDeletedNotification(
+    boardId: string,
+    cardId: string,
+    deletingUserId: string,
+    cardTitle: string
+  ) {
+    try {
+      // Buscar membros do board
+      const boardMembers = await prisma.boardMember.findMany({
+        where: { boardId },
+        select: { userId: true },
+      });
+
+      const deletingUser = await prisma.user.findUnique({
+        where: { id: deletingUserId },
+        select: { name: true },
+      });
+
+      if (!deletingUser) {
+        return [];
+      }
+
+      const notifications = [];
+
+      // Criar notificação para cada membro (exceto quem excluiu)
+      for (const member of boardMembers) {
+        if (member.userId !== deletingUserId) {
+          const notification = await prisma.notification.create({
+            data: {
+              userId: member.userId,
+              type: 'CARD_DELETED',
+              content: `${deletingUser.name} excluiu o card "${cardTitle}"`,
+              isRead: false,
+            },
+          });
+
+          notifications.push(notification);
+
+          // Emitir evento WebSocket
+          io.to(`user:${member.userId}`).emit('notification', notification);
+        }
+      }
+
+      return notifications;
+    } catch (error) {
+      console.error('Error creating card deleted notifications:', error);
       return [];
     }
   },

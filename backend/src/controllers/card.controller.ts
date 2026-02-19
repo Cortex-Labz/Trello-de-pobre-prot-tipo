@@ -5,6 +5,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { io } from '../index';
 import { emitBoardUpdate } from '../services/websocket.service';
 import { activityService } from '../services/activityService';
+import { notificationService } from '../services/notificationService';
 
 // GET /api/cards/:id
 export async function getCard(req: AuthRequest, res: Response): Promise<void> {
@@ -140,6 +141,7 @@ export async function createCard(req: AuthRequest, res: Response): Promise<void>
       select: {
         id: true,
         boardId: true,
+        title: true,
       },
     });
 
@@ -174,6 +176,15 @@ export async function createCard(req: AuthRequest, res: Response): Promise<void>
       req.userId!,
       card.title
     );
+
+    // Notify board members about new card (fire and forget)
+    notificationService.createCardCreatedNotification(
+      list.boardId,
+      card.id,
+      req.userId!,
+      card.title,
+      list.title
+    ).catch(console.error);
 
     emitBoardUpdate(io, list.boardId, 'card:created', {
       ...card,
@@ -307,6 +318,22 @@ export async function deleteCard(req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
+    // Log activity before deletion (card won't exist after)
+    await activityService.logCardDeleted(
+      card.list.boardId,
+      id,
+      req.userId!,
+      card.title
+    );
+
+    // Notify board members about card deletion (fire and forget, before deletion)
+    notificationService.createCardDeletedNotification(
+      card.list.boardId,
+      id,
+      req.userId!,
+      card.title
+    ).catch(console.error);
+
     await prisma.card.delete({
       where: { id },
     });
@@ -374,12 +401,48 @@ export async function moveCard(req: AuthRequest, res: Response): Promise<void> {
       }),
     ]);
 
-    const updatedCard = await prisma.card.update({
-      where: { id },
-      data: {
-        listId,
-        position,
-      },
+    // Use a transaction to move card and reorder all affected lists
+    const updatedCard = await prisma.$transaction(async (tx) => {
+      // 1. Move the card to new list/position
+      const moved = await tx.card.update({
+        where: { id },
+        data: {
+          listId,
+          position,
+        },
+      });
+
+      // 2. Reorder destination list: get all cards in order, assign sequential positions
+      const destCards = await tx.card.findMany({
+        where: { listId, isArchived: false },
+        orderBy: { position: 'asc' },
+        select: { id: true },
+      });
+      // The moved card is already at `position`, but others may collide.
+      // Re-assign: moved card stays at `position`, shift others around it.
+      const destOrdered = destCards.filter(c => c.id !== id);
+      destOrdered.splice(position, 0, { id });
+      await Promise.all(
+        destOrdered.map((c, idx) =>
+          tx.card.update({ where: { id: c.id }, data: { position: idx } })
+        )
+      );
+
+      // 3. If moved to a different list, reorder source list too
+      if (card.listId !== listId) {
+        const srcCards = await tx.card.findMany({
+          where: { listId: card.listId, isArchived: false },
+          orderBy: { position: 'asc' },
+          select: { id: true },
+        });
+        await Promise.all(
+          srcCards.map((c, idx) =>
+            tx.card.update({ where: { id: c.id }, data: { position: idx } })
+          )
+        );
+      }
+
+      return moved;
     });
 
     // Log activity if card moved to different list
@@ -391,6 +454,16 @@ export async function moveCard(req: AuthRequest, res: Response): Promise<void> {
         fromList.title,
         toList.title
       );
+
+      // Notify board members about move (fire and forget)
+      notificationService.createCardMovedNotification(
+        card.list.boardId,
+        id,
+        req.userId!,
+        card.title,
+        fromList.title,
+        toList.title
+      ).catch(console.error);
     }
 
     emitBoardUpdate(io, card.list.boardId, 'card:moved', updatedCard);
@@ -583,6 +656,14 @@ export async function addCardMember(req: AuthRequest, res: Response): Promise<vo
       member.user.name
     );
 
+    // Notify assigned user (fire and forget)
+    notificationService.createAssignmentNotification(
+      userId,
+      req.userId!,
+      id,
+      card.title
+    ).catch(console.error);
+
     emitBoardUpdate(io, card.list.boardId, 'card:member:added', {
       cardId: id,
       member,
@@ -631,6 +712,12 @@ export async function removeCardMember(req: AuthRequest, res: Response): Promise
       return;
     }
 
+    // Fetch removed user name before deletion for activity log
+    const removedUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+
     await prisma.cardMember.delete({
       where: {
         cardId_userId: {
@@ -639,6 +726,15 @@ export async function removeCardMember(req: AuthRequest, res: Response): Promise
         },
       },
     });
+
+    // Log activity
+    await activityService.logMemberRemoved(
+      card.list.boardId,
+      id,
+      req.userId!,
+      userId,
+      removedUser?.name || 'Unknown'
+    );
 
     emitBoardUpdate(io, card.list.boardId, 'card:member:removed', {
       cardId: id,
@@ -649,6 +745,66 @@ export async function removeCardMember(req: AuthRequest, res: Response): Promise
   } catch (error) {
     console.error('Remove card member error:', error);
     res.status(500).json({ error: 'Failed to remove card member' });
+  }
+}
+
+// GET /api/cards/my-cards
+export async function getMyCards(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const cards = await prisma.card.findMany({
+      where: {
+        isArchived: false,
+        members: {
+          some: {
+            userId: req.userId,
+          },
+        },
+        list: {
+          isArchived: false,
+          board: {
+            isArchived: false,
+          },
+        },
+      },
+      include: {
+        list: {
+          select: {
+            id: true,
+            title: true,
+            board: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        labels: {
+          include: {
+            label: true,
+          },
+        },
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
+
+    res.json({ cards, total: cards.length });
+  } catch (error) {
+    console.error('Get my cards error:', error);
+    res.status(500).json({ error: 'Failed to fetch my cards' });
   }
 }
 

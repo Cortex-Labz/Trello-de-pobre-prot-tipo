@@ -10,8 +10,8 @@ export default function ThemeToggle() {
         onClick={() => setIsSettingsOpen(true)}
         className="w-10 h-10 rounded-[10px] flex items-center justify-center transition-all duration-200"
         style={{
-          background: 'rgba(20, 22, 33, 0.6)',
-          color: '#9ca3af',
+          background: 'var(--surface-input)',
+          color: 'var(--text-muted)',
         }}
         title="Configurações"
         aria-label="Open settings"

@@ -4,6 +4,7 @@ import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { io } from '../index';
 import { emitBoardUpdate } from '../services/websocket.service';
+import { activityService } from '../services/activityService';
 
 // POST /api/lists
 export async function createList(req: AuthRequest, res: Response): Promise<void> {
@@ -43,6 +44,8 @@ export async function createList(req: AuthRequest, res: Response): Promise<void>
         position,
       },
     });
+
+    activityService.logListCreated(boardId, req.userId!, title).catch(console.error);
 
     emitBoardUpdate(io, boardId, 'list:created', list);
 
@@ -86,6 +89,10 @@ export async function updateList(req: AuthRequest, res: Response): Promise<void>
     if (!list) {
       res.status(404).json({ error: 'List not found or insufficient permissions' });
       return;
+    }
+
+    if (title && title !== list.title) {
+      activityService.logListRenamed(list.board.id, req.userId!, list.title, title).catch(console.error);
     }
 
     const updatedList = await prisma.list.update({
@@ -138,6 +145,8 @@ export async function deleteList(req: AuthRequest, res: Response): Promise<void>
       res.status(404).json({ error: 'List not found or insufficient permissions' });
       return;
     }
+
+    activityService.logListDeleted(list.board.id, req.userId!, list.title).catch(console.error);
 
     await prisma.list.delete({
       where: { id },

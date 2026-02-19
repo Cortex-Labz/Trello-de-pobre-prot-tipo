@@ -57,4 +57,9 @@ export const cardService = {
   async removeMember(cardId: string, userId: string): Promise<void> {
     await api.delete(`/cards/${cardId}/members/${userId}`);
   },
+
+  async getMyCards(): Promise<{ cards: Card[]; total: number }> {
+    const response = await api.get<{ cards: Card[]; total: number }>('/cards/my-cards');
+    return response.data;
+  },
 };

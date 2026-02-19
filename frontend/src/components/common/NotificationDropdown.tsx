@@ -87,6 +87,18 @@ export default function NotificationDropdown() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
           </svg>
         );
+      case 'CARD_CREATED':
+        return (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+        );
+      case 'CARD_DELETED':
+        return (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        );
       default:
         return (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -109,14 +121,14 @@ export default function NotificationDropdown() {
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative" style={{ zIndex: 9999 }} ref={dropdownRef}>
       {/* Notification Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-10 h-10 rounded-[10px] flex items-center justify-center transition-all hover:scale-105 relative group"
         style={{
-          background: isOpen ? 'rgba(20, 22, 33, 0.9)' : 'rgba(20, 22, 33, 0.6)',
-          color: '#9ca3af',
+          background: isOpen ? 'var(--surface-sidebar-input)' : 'var(--surface-input)',
+          color: 'var(--text-muted)',
         }}
         title="Notificações"
       >
@@ -138,11 +150,12 @@ export default function NotificationDropdown() {
       {/* Dropdown */}
       {isOpen && (
         <div
-          className="absolute right-0 mt-2 w-96 rounded-2xl shadow-2xl overflow-hidden z-50"
+          className="absolute right-0 mt-2 w-96 rounded-2xl shadow-2xl overflow-hidden"
           style={{
             background: 'var(--surface-primary)',
             border: '1px solid var(--border-color)',
             maxHeight: '500px',
+            zIndex: 99999,
           }}
         >
           {/* Header */}

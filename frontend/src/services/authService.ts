@@ -21,4 +21,14 @@ export const authService = {
     const response = await api.put<{ user: User }>('/auth/me', data);
     return response.data;
   },
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    const response = await api.put('/auth/me/password', { currentPassword, newPassword });
+    return response.data;
+  },
+
+  async uploadAvatar(imageData: string): Promise<{ user: User }> {
+    const response = await api.post('/auth/me/avatar', { imageData });
+    return response.data;
+  },
 };

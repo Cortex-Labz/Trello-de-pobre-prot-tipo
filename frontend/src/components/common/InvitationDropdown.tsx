@@ -85,8 +85,8 @@ export default function InvitationDropdown() {
         onClick={() => setIsOpen(!isOpen)}
         className="w-10 h-10 rounded-[10px] flex items-center justify-center transition-all hover:scale-105 relative group"
         style={{
-          background: isOpen ? 'rgba(20, 22, 33, 0.9)' : 'rgba(20, 22, 33, 0.6)',
-          color: '#9ca3af',
+          background: isOpen ? 'var(--surface-sidebar-input)' : 'var(--surface-input)',
+          color: 'var(--text-muted)',
         }}
         title="Convites"
       >
@@ -210,7 +210,7 @@ export default function InvitationDropdown() {
                           className="text-xs px-2 py-0.5 rounded font-medium"
                           style={{
                             background: invitation.role === 'ADMIN'
-                              ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                              ? 'var(--gradient-primary)'
                               : 'var(--surface-hover)',
                             color: invitation.role === 'ADMIN' ? 'white' : 'var(--text-primary)',
                           }}
@@ -231,7 +231,7 @@ export default function InvitationDropdown() {
                       disabled={acceptMutation.isPending || declineMutation.isPending}
                       className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
                       style={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        background: 'var(--gradient-primary)',
                         color: 'white',
                       }}
                     >

@@ -441,6 +441,183 @@ export async function removeMember(req: AuthRequest, res: Response): Promise<voi
   }
 }
 
+// GET /api/workspaces/:id/members?q=searchTerm
+export async function getWorkspaceMembers(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const q = req.query.q as string | undefined;
+
+    // Verify requester has access to the workspace (is owner or member)
+    const workspace = await prisma.workspace.findFirst({
+      where: {
+        id,
+        OR: [
+          { ownerId: req.userId },
+          {
+            members: {
+              some: {
+                userId: req.userId,
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    if (!workspace) {
+      res.status(404).json({ error: 'Workspace not found' });
+      return;
+    }
+
+    // Fetch owner details
+    const owner = await prisma.user.findUnique({
+      where: { id: workspace.ownerId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatarUrl: true,
+      },
+    });
+
+    // Fetch all workspace members (excluding the requester)
+    const workspaceMembers = await prisma.workspaceMember.findMany({
+      where: {
+        workspaceId: id,
+        userId: { not: req.userId },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    // Build the members list
+    const members: Array<{ id: string; name: string; email: string; avatarUrl: string | null }> = [];
+
+    // Add owner if not the requester
+    if (owner && workspace.ownerId !== req.userId) {
+      members.push(owner);
+    }
+
+    // Add workspace members
+    for (const m of workspaceMembers) {
+      members.push(m.user);
+    }
+
+    // Filter by search query (case-insensitive) in JavaScript since SQLite doesn't support mode: 'insensitive'
+    const filtered = q
+      ? members.filter(
+          (m) =>
+            m.name.toLowerCase().includes(q.toLowerCase()) ||
+            m.email.toLowerCase().includes(q.toLowerCase())
+        )
+      : members;
+
+    res.json({ members: filtered });
+  } catch (error) {
+    console.error('Get workspace members error:', error);
+    res.status(500).json({ error: 'Failed to fetch workspace members' });
+  }
+}
+
+// GET /api/workspaces/:id/activities?limit=50&offset=0&type=&boardId=
+export async function getWorkspaceActivities(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+    const typeFilter = req.query.type as string | undefined;
+    const boardFilter = req.query.boardId as string | undefined;
+
+    // Check if user is owner or admin of workspace
+    const workspace = await prisma.workspace.findFirst({
+      where: {
+        id,
+        OR: [
+          { ownerId: req.userId },
+          {
+            members: {
+              some: {
+                userId: req.userId,
+                role: 'ADMIN',
+              },
+            },
+          },
+        ],
+      },
+      include: {
+        boards: {
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!workspace) {
+      res.status(403).json({ error: 'Only workspace admins can view activity log' });
+      return;
+    }
+
+    const boardIds = workspace.boards.map(b => b.id);
+
+    if (boardIds.length === 0) {
+      res.json({ activities: [], total: 0 });
+      return;
+    }
+
+    const where: any = {
+      boardId: { in: boardFilter ? [boardFilter] : boardIds },
+    };
+
+    if (typeFilter) {
+      where.actionType = typeFilter;
+    }
+
+    const [activities, total] = await Promise.all([
+      prisma.activity.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              avatarUrl: true,
+            },
+          },
+          board: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          card: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.activity.count({ where }),
+    ]);
+
+    res.json({ activities, total });
+  } catch (error) {
+    console.error('Get workspace activities error:', error);
+    res.status(500).json({ error: 'Failed to fetch workspace activities' });
+  }
+}
+
 // PUT /api/workspaces/reorder
 export async function reorderWorkspaces(req: AuthRequest, res: Response): Promise<void> {
   try {

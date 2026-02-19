@@ -4,7 +4,7 @@ export interface CreateActivityData {
   boardId: string;
   cardId?: string;
   userId: string;
-  actionType: 'CREATED' | 'UPDATED' | 'MOVED' | 'ARCHIVED' | 'DELETED' | 'COMMENTED' | 'ASSIGNED' | 'LABELED' | 'ATTACHED' | 'COVER_CHANGED' | 'DUE_DATE_CHANGED' | 'COMPLETION_TIME_SET';
+  actionType: 'CREATED' | 'UPDATED' | 'MOVED' | 'ARCHIVED' | 'DELETED' | 'COMMENTED' | 'ASSIGNED' | 'MEMBER_REMOVED' | 'LABELED' | 'ATTACHED' | 'COVER_CHANGED' | 'DUE_DATE_CHANGED' | 'COMPLETION_TIME_SET' | 'LIST_CREATED' | 'LIST_DELETED' | 'LIST_RENAMED' | 'BOARD_MEMBER_ADDED' | 'BOARD_MEMBER_REMOVED';
   details?: any; // JSON object with action details
 }
 
@@ -209,6 +209,78 @@ export const activityService = {
       userId,
       actionType: 'COMPLETION_TIME_SET',
       details: { completionTime },
+    });
+  },
+
+  // Helper para registrar exclusão de card
+  async logCardDeleted(boardId: string, cardId: string, userId: string, cardTitle: string) {
+    return this.createActivity({
+      boardId,
+      cardId,
+      userId,
+      actionType: 'DELETED',
+      details: { cardTitle },
+    });
+  },
+
+  // Helper para registrar remoção de membro de card
+  async logMemberRemoved(boardId: string, cardId: string, userId: string, removedUserId: string, removedUserName: string) {
+    return this.createActivity({
+      boardId,
+      cardId,
+      userId,
+      actionType: 'MEMBER_REMOVED',
+      details: { removedUserId, removedUserName },
+    });
+  },
+
+  // Helper para registrar criação de lista
+  async logListCreated(boardId: string, userId: string, listTitle: string) {
+    return this.createActivity({
+      boardId,
+      userId,
+      actionType: 'LIST_CREATED',
+      details: { listTitle },
+    });
+  },
+
+  // Helper para registrar exclusão de lista
+  async logListDeleted(boardId: string, userId: string, listTitle: string) {
+    return this.createActivity({
+      boardId,
+      userId,
+      actionType: 'LIST_DELETED',
+      details: { listTitle },
+    });
+  },
+
+  // Helper para registrar renomeação de lista
+  async logListRenamed(boardId: string, userId: string, oldTitle: string, newTitle: string) {
+    return this.createActivity({
+      boardId,
+      userId,
+      actionType: 'LIST_RENAMED',
+      details: { oldTitle, newTitle },
+    });
+  },
+
+  // Helper para registrar adição de membro ao board
+  async logBoardMemberAdded(boardId: string, userId: string, memberName: string, memberRole: string) {
+    return this.createActivity({
+      boardId,
+      userId,
+      actionType: 'BOARD_MEMBER_ADDED',
+      details: { memberName, memberRole },
+    });
+  },
+
+  // Helper para registrar remoção de membro do board
+  async logBoardMemberRemoved(boardId: string, userId: string, memberName: string) {
+    return this.createActivity({
+      boardId,
+      userId,
+      actionType: 'BOARD_MEMBER_REMOVED',
+      details: { memberName },
     });
   },
 };

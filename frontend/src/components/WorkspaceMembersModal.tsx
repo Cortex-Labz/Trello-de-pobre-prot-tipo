@@ -6,6 +6,7 @@ import { workspaceService } from '../services/workspaceService';
 import { invitationService } from '../services/invitationService';
 import { useAuthStore } from '../store/authStore';
 import UserSearchDropdown from './common/UserSearchDropdown';
+import { useConfirmModal } from '../hooks/useConfirmModal';
 
 interface WorkspaceMembersModalProps {
   workspace: Workspace;
@@ -20,6 +21,7 @@ export default function WorkspaceMembersModal({
 }: WorkspaceMembersModalProps) {
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuthStore();
+  const { confirm: confirmAction, ConfirmDialog } = useConfirmModal();
   const [showAddMember, setShowAddMember] = useState(false);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -87,8 +89,14 @@ export default function WorkspaceMembersModal({
     updateRoleMutation.mutate({ userId, role: newRole });
   };
 
-  const handleRemoveMember = (userId: string) => {
-    if (confirm('Tem certeza que deseja remover este membro?')) {
+  const handleRemoveMember = async (userId: string) => {
+    const confirmed = await confirmAction({
+      title: 'Remover membro',
+      message: 'Tem certeza que deseja remover este membro do workspace?',
+      confirmText: 'Remover',
+      variant: 'danger',
+    });
+    if (confirmed) {
       removeMemberMutation.mutate(userId);
     }
   };
@@ -139,7 +147,7 @@ export default function WorkspaceMembersModal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        backgroundColor: 'var(--overlay-bg)',
         backdropFilter: 'blur(8px)',
       }}
       onClick={onClose}
@@ -149,7 +157,7 @@ export default function WorkspaceMembersModal({
         style={{
           background: 'var(--surface-primary)',
           backdropFilter: 'blur(20px)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          boxShadow: 'var(--shadow-lg)',
           border: '1px solid var(--border-color)',
         }}
         onClick={(e) => e.stopPropagation()}
@@ -274,7 +282,7 @@ export default function WorkspaceMembersModal({
                     disabled={inviteMutation.isPending}
                     className="flex-1 px-4 py-2 rounded-lg font-medium transition-all"
                     style={{
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      background: 'var(--gradient-primary)',
                       color: 'white',
                     }}
                   >
@@ -457,6 +465,7 @@ export default function WorkspaceMembersModal({
           </p>
         )}
       </div>
+      <ConfirmDialog />
     </div>,
     document.body
   );

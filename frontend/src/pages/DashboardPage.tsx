@@ -5,8 +5,61 @@ import { Link, useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { workspaceService } from '../services/workspaceService';
 import { boardService } from '../services/boardService';
+import { listService } from '../services/listService';
+import { cardService } from '../services/cardService';
 import { useAuthStore } from '../store/authStore';
+import { useConfirmModal } from '../hooks/useConfirmModal';
 import WorkspaceMembersModal from '../components/WorkspaceMembersModal';
+import WorkspaceActivityFeed from '../components/WorkspaceActivityFeed';
+import NotificationDropdown from '../components/common/NotificationDropdown';
+import NotificationProvider from '../components/common/NotificationProvider';
+import SettingsModal from '../components/common/SettingsModal';
+
+// Board Templates
+const BOARD_TEMPLATES = [
+  {
+    id: 'kanban',
+    name: 'Kanban',
+    icon: '📋',
+    description: 'Fluxo de trabalho visual',
+    lists: ['Backlog', 'A fazer', 'Em progresso', 'Em revisão', 'Concluído'],
+  },
+  {
+    id: 'projeto',
+    name: 'Projeto',
+    icon: '🎯',
+    description: 'Gestão simples de projeto',
+    lists: ['Planejamento', 'A fazer', 'Fazendo', 'Feito'],
+  },
+  {
+    id: 'sprint',
+    name: 'Sprint',
+    icon: '🚀',
+    description: 'Desenvolvimento ágil',
+    lists: ['Sprint Backlog', 'Em desenvolvimento', 'Code Review', 'QA', 'Done'],
+  },
+  {
+    id: 'bugs',
+    name: 'Bug Tracking',
+    icon: '🐛',
+    description: 'Rastreamento de bugs',
+    lists: ['Reportado', 'Investigando', 'Em correção', 'Corrigido', 'Fechado'],
+  },
+  {
+    id: 'conteudo',
+    name: 'Conteúdo',
+    icon: '📝',
+    description: 'Pipeline de conteúdo',
+    lists: ['Ideias', 'Rascunho', 'Em revisão', 'Aprovado', 'Publicado'],
+  },
+  {
+    id: 'design',
+    name: 'Design',
+    icon: '🎨',
+    description: 'Processo de design',
+    lists: ['Briefing', 'Wireframe', 'Design', 'Revisão', 'Aprovado'],
+  },
+];
 
 // Inject keyframes once
 const dpStyleId = 'dashboard-page-keyframes';
@@ -27,26 +80,37 @@ function injectDashboardKeyframes() {
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
     }
+    @keyframes dp-highlight-pulse {
+      0% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0); }
+      20% { box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.3); }
+      40% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0); }
+      60% { box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.2); }
+      100% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0); }
+    }
+    .dp-section-highlight {
+      animation: dp-highlight-pulse 1.2s ease-out;
+      border-radius: 12px;
+    }
 
     /* Sidebar scrollbar */
     .dp-workspace-list::-webkit-scrollbar { width: 4px; }
-    .dp-workspace-list::-webkit-scrollbar-thumb { background: rgba(102, 126, 234, 0.2); border-radius: 2px; }
+    .dp-workspace-list::-webkit-scrollbar-thumb { background: var(--accent-bg-strong); border-radius: 2px; }
 
     /* Main scrollbar */
     .dp-main::-webkit-scrollbar { width: 6px; }
     .dp-main::-webkit-scrollbar-track { background: transparent; }
-    .dp-main::-webkit-scrollbar-thumb { background: rgba(102, 126, 234, 0.15); border-radius: 3px; }
-    .dp-main::-webkit-scrollbar-thumb:hover { background: rgba(102, 126, 234, 0.25); }
+    .dp-main::-webkit-scrollbar-thumb { background: var(--border-accent-medium); border-radius: 3px; }
+    .dp-main::-webkit-scrollbar-thumb:hover { background: var(--accent-bg-strong); }
 
     /* Favorites row scrollbar */
     .dp-favorites-row::-webkit-scrollbar { height: 4px; }
-    .dp-favorites-row::-webkit-scrollbar-thumb { background: rgba(102, 126, 234, 0.15); border-radius: 2px; }
+    .dp-favorites-row::-webkit-scrollbar-thumb { background: var(--border-accent-medium); border-radius: 2px; }
 
     /* Search bar focus styling */
     .dp-search-bar:focus-within {
-      border-color: rgba(102, 126, 234, 0.3) !important;
-      background: rgba(25, 28, 40, 0.8) !important;
-      box-shadow: 0 0 20px rgba(102, 126, 234, 0.08) !important;
+      border-color: var(--accent-bg-strong) !important;
+      background: var(--surface-card-solid) !important;
+      box-shadow: 0 0 20px var(--accent-bg) !important;
     }
 
     /* Board card hover effects */
@@ -71,61 +135,56 @@ function injectDashboardKeyframes() {
 
     /* Create board card hover */
     .dp-board-card-new:hover {
-      border-color: rgba(102, 126, 234, 0.4) !important;
-      background: rgba(102, 126, 234, 0.06) !important;
+      border-color: var(--accent-bg-strong) !important;
+      background: var(--accent-bg-subtle) !important;
       transform: translateY(-2px);
     }
     .dp-board-card-new:hover .dp-new-icon {
-      background: rgba(102, 126, 234, 0.2) !important;
+      background: var(--accent-bg-strong) !important;
       transform: rotate(90deg);
     }
 
     /* Nav item hover */
     .dp-nav-item:hover {
-      color: #c8cad0 !important;
-      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-secondary) !important;
+      background: var(--border-subtle);
     }
 
     /* Workspace sidebar item hover */
     .dp-ws-sidebar-item:hover {
-      background: rgba(255, 255, 255, 0.04);
+      background: var(--border-subtle);
     }
 
     /* User card hover */
     .dp-user-card:hover {
-      border-color: rgba(102, 126, 234, 0.15) !important;
-      background: rgba(25, 28, 40, 0.8) !important;
+      border-color: var(--border-accent-medium) !important;
+      background: var(--surface-card-solid) !important;
     }
 
     /* Stat card hover */
     .dp-stat-card:hover {
-      border-color: rgba(102, 126, 234, 0.12) !important;
-      background: rgba(25, 28, 40, 0.6) !important;
+      border-color: var(--accent-bg-medium) !important;
+      background: var(--surface-card-solid) !important;
     }
 
     /* Notification btn hover */
     .dp-notif-btn:hover {
-      color: #b8bcc8 !important;
-      border-color: rgba(102, 126, 234, 0.2) !important;
+      color: var(--text-secondary) !important;
+      border-color: var(--accent-bg-strong) !important;
     }
 
     /* Section add btn hover */
     .dp-section-btn:hover {
-      background: rgba(102, 126, 234, 0.25) !important;
+      background: var(--accent-bg-strong) !important;
       transform: scale(1.1);
     }
 
     /* WS more btn hover */
     .dp-ws-more-btn:hover {
-      background: rgba(255, 255, 255, 0.05) !important;
-      color: #b8bcc8 !important;
+      background: var(--surface-subtle) !important;
+      color: var(--text-secondary) !important;
     }
 
-    /* Logout btn hover */
-    .dp-logout-btn:hover {
-      color: #ef4444 !important;
-      background: rgba(239, 68, 68, 0.1) !important;
-    }
   `;
   document.head.appendChild(style);
 }
@@ -135,7 +194,9 @@ export default function DashboardPage() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { confirm: confirmAction, ConfirmDialog } = useConfirmModal();
   const [showModal, setShowModal] = useState(false);
+  const [showActivityModal, setShowActivityModal] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState<string | null>(null);
@@ -145,6 +206,7 @@ export default function DashboardPage() {
   const [showCreateBoardModal, setShowCreateBoardModal] = useState<{ workspaceId: string } | null>(null);
   const [boardName, setBoardName] = useState('');
   const [boardColor, setBoardColor] = useState('#667eea');
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [favoriteWorkspaces, setFavoriteWorkspaces] = useState<string[]>(() => {
     const saved = localStorage.getItem('favoriteWorkspaces');
     return saved ? JSON.parse(saved) : [];
@@ -155,12 +217,28 @@ export default function DashboardPage() {
   });
   const [workspaceMembersModal, setWorkspaceMembersModal] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Inject keyframes on mount
   useEffect(() => {
     injectDashboardKeyframes();
   }, []);
+
+  // Close user menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    if (showUserMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showUserMenu]);
 
   // Ctrl+K shortcut for search
   useEffect(() => {
@@ -222,6 +300,14 @@ export default function DashboardPage() {
     enabled: workspaces.length > 0,
   });
 
+  // Fetch cards assigned to the current user
+  const { data: myCardsData } = useQuery({
+    queryKey: ['myCards'],
+    queryFn: () => cardService.getMyCards(),
+  });
+  const myCards = myCardsData?.cards || [];
+  const activeTasks = myCards.filter(c => !c.isCompleted).length;
+
   const createMutation = useMutation({
     mutationFn: (data: { name: string; description?: string }) =>
       workspaceService.createWorkspace(data),
@@ -251,13 +337,30 @@ export default function DashboardPage() {
   });
 
   const createBoardMutation = useMutation({
-    mutationFn: (data: { workspaceId: string; name: string; backgroundColor?: string }) =>
-      boardService.createBoard(data),
+    mutationFn: async (data: { workspaceId: string; name: string; backgroundColor?: string; templateId?: string | null }) => {
+      const { templateId, ...boardData } = data;
+      const result = await boardService.createBoard(boardData);
+      // Create template lists if a template was selected
+      if (templateId) {
+        const template = BOARD_TEMPLATES.find(t => t.id === templateId);
+        if (template) {
+          for (let i = 0; i < template.lists.length; i++) {
+            await listService.createList({
+              boardId: result.board.id,
+              title: template.lists[i],
+              position: (i + 1) * 1000,
+            });
+          }
+        }
+      }
+      return result;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allBoards'] });
       setShowCreateBoardModal(null);
       setBoardName('');
       setBoardColor('#667eea');
+      setSelectedTemplate(null);
     },
   });
 
@@ -314,8 +417,14 @@ export default function DashboardPage() {
     }
   };
 
-  const handleDeleteWorkspace = (workspaceId: string) => {
-    if (confirm('Tem certeza que deseja deletar este workspace? Todos os boards serao perdidos!')) {
+  const handleDeleteWorkspace = async (workspaceId: string) => {
+    const confirmed = await confirmAction({
+      title: 'Deletar workspace',
+      message: 'Tem certeza que deseja deletar este workspace? Todos os boards serao perdidos!',
+      confirmText: 'Deletar',
+      variant: 'danger',
+    });
+    if (confirmed) {
       deleteWorkspaceMutation.mutate(workspaceId);
     }
   };
@@ -338,7 +447,7 @@ export default function DashboardPage() {
 
   // Workspace icon colors - cycling through different colors
   const workspaceIconColors = [
-    { bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: '#667eea' },
+    { bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'var(--accent)' },
     { bg: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: '#f093fb' },
     { bg: 'linear-gradient(135deg, #0093E9 0%, #80D0C7 100%)', color: '#0093E9' },
     { bg: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)', color: '#fcb69f' },
@@ -364,7 +473,6 @@ export default function DashboardPage() {
   };
 
   // Get user initials
-  const userInitials = user ? user.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase() : '';
 
   // Get all favorite board objects (for the favorites section)
   const allBoards = workspaces.flatMap(ws =>
@@ -385,8 +493,8 @@ export default function DashboardPage() {
       display: 'flex',
       height: '100vh',
       overflow: 'hidden',
-      background: '#0f1117',
-      color: '#e4e6eb',
+      background: 'var(--surface-base)',
+      color: 'var(--text-primary)',
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
     }}>
       {/* ===== SIDEBAR ===== */}
@@ -395,9 +503,9 @@ export default function DashboardPage() {
         flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
-        background: 'rgba(17, 19, 28, 0.85)',
+        background: 'var(--surface-chrome)',
         backdropFilter: 'blur(24px)',
-        borderRight: '1px solid rgba(102, 126, 234, 0.08)',
+        borderRight: '1px solid var(--border-accent)',
         padding: '20px 14px',
         position: 'relative',
         zIndex: 10,
@@ -409,7 +517,7 @@ export default function DashboardPage() {
           left: 0,
           right: 0,
           height: 120,
-          background: 'linear-gradient(180deg, rgba(102, 126, 234, 0.06) 0%, transparent 100%)',
+          background: 'linear-gradient(180deg, var(--accent-bg-subtle) 0%, transparent 100%)',
           pointerEvents: 'none',
         }} />
 
@@ -426,11 +534,11 @@ export default function DashboardPage() {
             width: 36,
             height: 36,
             borderRadius: 10,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'var(--gradient-primary)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(102, 126, 234, 0.3)',
+            boxShadow: 'var(--shadow-glow)',
           }}>
             <svg width="20" height="20" fill="none" stroke="white" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
@@ -440,7 +548,7 @@ export default function DashboardPage() {
             fontSize: 16,
             fontWeight: 700,
             letterSpacing: -0.3,
-            background: 'linear-gradient(135deg, #e4e6eb 0%, #b8bcc8 100%)',
+            background: 'linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
           }}>VersatlyTask</span>
@@ -457,12 +565,12 @@ export default function DashboardPage() {
               gap: 12,
               padding: '10px 12px',
               borderRadius: 10,
-              color: 'white',
+              color: 'var(--text-primary)',
               fontSize: 13.5,
-              fontWeight: 500,
+              fontWeight: 600,
               textDecoration: 'none',
               position: 'relative',
-              background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.18) 0%, rgba(118, 75, 162, 0.12) 100%)',
+              background: 'var(--gradient-nav-active)',
             }}
           >
             {/* Active left bar indicator */}
@@ -474,7 +582,7 @@ export default function DashboardPage() {
               width: 3,
               height: 20,
               borderRadius: '0 3px 3px 0',
-              background: 'linear-gradient(180deg, #667eea, #764ba2)',
+              background: 'var(--gradient-nav-bar)',
             }} />
             <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -482,8 +590,19 @@ export default function DashboardPage() {
             <span>Home</span>
           </Link>
 
-          <Link
-            to="/boards"
+          <button
+            onClick={() => {
+              const el = document.getElementById('section-workspaces');
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Find the next sibling (the DragDropContext wrapper) to highlight
+                const target = el.nextElementSibling;
+                if (target) {
+                  (target as HTMLElement).classList.add('dp-section-highlight');
+                  setTimeout(() => (target as HTMLElement).classList.remove('dp-section-highlight'), 1300);
+                }
+              }
+            }}
             className="dp-nav-item"
             style={{
               display: 'flex',
@@ -491,10 +610,14 @@ export default function DashboardPage() {
               gap: 12,
               padding: '10px 12px',
               borderRadius: 10,
-              color: '#8b8fa3',
+              color: 'var(--text-faint)',
               fontSize: 13.5,
               fontWeight: 500,
-              textDecoration: 'none',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              width: '100%',
+              textAlign: 'left',
               position: 'relative',
               transition: 'all 0.2s ease',
             }}
@@ -505,17 +628,24 @@ export default function DashboardPage() {
             <span>Meus Boards</span>
             <span style={{
               marginLeft: 'auto',
-              background: 'rgba(102, 126, 234, 0.2)',
-              color: '#667eea',
+              background: 'var(--accent-bg-strong)',
+              color: 'var(--accent)',
               fontSize: 11,
               fontWeight: 600,
               padding: '2px 8px',
               borderRadius: 10,
             }}>{totalBoards}</span>
-          </Link>
+          </button>
 
-          <Link
-            to="/favorites"
+          <button
+            onClick={() => {
+              const el = document.getElementById('section-favorites');
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                el.classList.add('dp-section-highlight');
+                setTimeout(() => el.classList.remove('dp-section-highlight'), 1300);
+              }
+            }}
             className="dp-nav-item"
             style={{
               display: 'flex',
@@ -523,10 +653,14 @@ export default function DashboardPage() {
               gap: 12,
               padding: '10px 12px',
               borderRadius: 10,
-              color: '#8b8fa3',
+              color: 'var(--text-faint)',
               fontSize: 13.5,
               fontWeight: 500,
-              textDecoration: 'none',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              width: '100%',
+              textAlign: 'left',
               position: 'relative',
               transition: 'all 0.2s ease',
             }}
@@ -537,20 +671,47 @@ export default function DashboardPage() {
             <span>Favoritos</span>
             <span style={{
               marginLeft: 'auto',
-              background: 'rgba(102, 126, 234, 0.2)',
-              color: '#667eea',
+              background: 'var(--accent-bg-strong)',
+              color: 'var(--accent)',
               fontSize: 11,
               fontWeight: 600,
               padding: '2px 8px',
               borderRadius: 10,
             }}>{favoriteBoards.length}</span>
-          </Link>
+          </button>
+
+          <button
+            onClick={() => setShowActivityModal(true)}
+            className="dp-nav-item"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '10px 12px',
+              borderRadius: 10,
+              color: 'var(--text-faint)',
+              fontSize: 13.5,
+              fontWeight: 500,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              width: '100%',
+              textAlign: 'left',
+              position: 'relative',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Atividades</span>
+          </button>
         </div>
 
         {/* Sidebar divider */}
         <div style={{
           height: 1,
-          background: 'linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.12), transparent)',
+          background: 'linear-gradient(90deg, transparent, var(--accent-bg-medium), transparent)',
           margin: '4px 12px 16px',
         }} />
 
@@ -567,7 +728,7 @@ export default function DashboardPage() {
             fontWeight: 700,
             textTransform: 'uppercase',
             letterSpacing: 1,
-            color: '#5a5f73',
+            color: 'var(--text-dimmed)',
           }}>Workspaces</span>
           <button
             onClick={() => setShowModal(true)}
@@ -577,8 +738,8 @@ export default function DashboardPage() {
               height: 22,
               borderRadius: 6,
               border: 'none',
-              background: 'rgba(102, 126, 234, 0.12)',
-              color: '#667eea',
+              background: 'var(--accent-bg)',
+              color: 'var(--accent)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -634,7 +795,7 @@ export default function DashboardPage() {
                 <span style={{
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#b8bcc8',
+                  color: 'var(--text-secondary)',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -642,87 +803,13 @@ export default function DashboardPage() {
                 <span style={{
                   marginLeft: 'auto',
                   fontSize: 11,
-                  color: '#5a5f73',
+                  color: 'var(--text-dimmed)',
                 }}>{boardCount}</span>
               </div>
             );
           })}
         </div>
 
-        {/* User profile at bottom */}
-        <div style={{
-          marginTop: 'auto',
-          paddingTop: 16,
-          borderTop: '1px solid rgba(102, 126, 234, 0.08)',
-        }}>
-          <div className="dp-user-card" style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: '10px 12px',
-            borderRadius: 10,
-            background: 'rgba(17, 19, 28, 0.6)',
-            border: '1px solid rgba(102, 126, 234, 0.06)',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}>
-            <div style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 12,
-              fontWeight: 700,
-              color: 'white',
-              flexShrink: 0,
-            }}>{userInitials}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: '#e4e6eb',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}>{user?.name}</div>
-              <div style={{
-                fontSize: 11,
-                color: '#5a5f73',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}>{user?.email}</div>
-            </div>
-            <button
-              onClick={() => {
-                logout();
-                navigate('/login');
-              }}
-              className="dp-logout-btn"
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                border: 'none',
-                background: 'transparent',
-                color: '#5a5f73',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.2s ease',
-              }}
-              title="Sair"
-            >
-              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* ===== MAIN CONTENT ===== */}
@@ -738,7 +825,21 @@ export default function DashboardPage() {
           left: 260,
           right: 0,
           bottom: 0,
-          background: 'radial-gradient(ellipse 60% 50% at 50% 0%, rgba(102, 126, 234, 0.06) 0%, transparent 60%), radial-gradient(circle at 80% 80%, rgba(118, 75, 162, 0.04) 0%, transparent 40%)',
+          background: 'radial-gradient(ellipse 60% 50% at 50% 0%, var(--accent-bg-subtle) 0%, transparent 60%), radial-gradient(circle at 80% 80%, var(--accent-bg-subtle) 0%, transparent 40%)',
+          pointerEvents: 'none',
+          zIndex: 0,
+        }} />
+        {/* Dot grid */}
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 260,
+          right: 0,
+          bottom: 0,
+          backgroundImage: 'radial-gradient(circle, var(--auth-grid-line) 1px, transparent 1px)',
+          backgroundSize: '28px 28px',
+          maskImage: 'radial-gradient(ellipse 70% 60% at 50% 30%, black 10%, transparent 70%)',
+          WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at 50% 30%, black 10%, transparent 70%)',
           pointerEvents: 'none',
           zIndex: 0,
         }} />
@@ -756,6 +857,8 @@ export default function DashboardPage() {
             justifyContent: 'space-between',
             marginBottom: 32,
             animation: 'dp-fadeInUp 0.4s ease-out forwards',
+            position: 'relative',
+            zIndex: 100,
           }}>
             <div>
               <h1 style={{
@@ -763,17 +866,17 @@ export default function DashboardPage() {
                 fontWeight: 700,
                 letterSpacing: -0.5,
                 marginBottom: 4,
-                color: '#e4e6eb',
+                color: 'var(--text-primary)',
                 margin: 0,
               }}>
-                {'Ola, '}
+                {'Olá, '}
                 <span style={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #a78bfa 100%)',
+                  background: 'var(--gradient-primary)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
                 }}>{user?.name}</span>
               </h1>
-              <p style={{ fontSize: 14, color: '#6b7084', margin: 0, marginTop: 4 }}>
+              <p style={{ fontSize: 14, color: 'var(--text-disabled)', margin: 0, marginTop: 4 }}>
                 Aqui esta o resumo dos seus workspaces e boards
               </p>
             </div>
@@ -785,12 +888,12 @@ export default function DashboardPage() {
                 gap: 10,
                 padding: '9px 16px',
                 borderRadius: 10,
-                background: 'rgba(25, 28, 40, 0.6)',
-                border: '1px solid rgba(102, 126, 234, 0.08)',
+                background: 'var(--surface-card-solid)',
+                border: '1px solid var(--border-accent)',
                 width: 280,
                 transition: 'all 0.2s ease',
               }}>
-                <svg width="16" height="16" fill="none" stroke="#5a5f73" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+                <svg width="16" height="16" fill="none" stroke="var(--text-dimmed)" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input
@@ -803,7 +906,7 @@ export default function DashboardPage() {
                     background: 'none',
                     border: 'none',
                     outline: 'none',
-                    color: '#e4e6eb',
+                    color: 'var(--text-primary)',
                     fontSize: 13,
                     width: '100%',
                     fontFamily: 'inherit',
@@ -811,8 +914,8 @@ export default function DashboardPage() {
                 />
                 <span style={{
                   fontSize: 10,
-                  color: '#4a4e63',
-                  border: '1px solid rgba(102, 126, 234, 0.12)',
+                  color: 'var(--text-disabled)',
+                  border: '1px solid var(--accent-bg-medium)',
                   borderRadius: 4,
                   padding: '2px 6px',
                   flexShrink: 0,
@@ -820,34 +923,154 @@ export default function DashboardPage() {
               </div>
 
               {/* Notification bell */}
-              <button className="dp-notif-btn" style={{
-                width: 36,
-                height: 36,
-                borderRadius: 10,
-                border: '1px solid rgba(102, 126, 234, 0.08)',
-                background: 'rgba(25, 28, 40, 0.6)',
-                color: '#5a5f73',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.2s',
-                position: 'relative',
-              }}>
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              <NotificationDropdown />
+
+              {/* Settings gear */}
+              <button
+                onClick={() => setShowSettingsModal(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  border: 'none',
+                  background: 'var(--surface-card-solid)',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+                title="Configurações"
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.background = 'var(--surface-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'var(--surface-card-solid)'; }}
+              >
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <span style={{
-                  position: 'absolute',
-                  top: 6,
-                  right: 6,
-                  width: 7,
-                  height: 7,
-                  borderRadius: '50%',
-                  background: '#667eea',
-                  border: '2px solid #0f1117',
-                }} />
               </button>
+
+              {/* User avatar menu */}
+              <div style={{ position: 'relative' }} ref={userMenuRef}>
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '4px 10px 4px 4px',
+                    borderRadius: 10,
+                    border: '1px solid var(--border-accent)',
+                    background: 'var(--surface-card-solid)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                  title={user?.name}
+                >
+                  {user?.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      className="object-cover"
+                      alt={user.name}
+                      style={{ width: 30, height: 30, borderRadius: 8 }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 8,
+                      background: 'var(--gradient-primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontSize: 12,
+                      fontWeight: 700,
+                    }}>
+                      {user && getInitials(user.name)}
+                    </div>
+                  )}
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {user?.name?.split(' ')[0]}
+                  </span>
+                  <svg width="14" height="14" fill="none" stroke="var(--text-muted)" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {showUserMenu && (
+                  <div style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: '100%',
+                    marginTop: 8,
+                    width: 220,
+                    borderRadius: 14,
+                    background: 'var(--surface-dropdown)',
+                    border: '1px solid var(--border-accent)',
+                    boxShadow: 'var(--shadow-lg)',
+                    zIndex: 50,
+                    overflow: 'hidden',
+                  }}>
+                    <div style={{
+                      padding: '12px 16px',
+                      borderBottom: '1px solid var(--border-subtle)',
+                    }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{user?.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{user?.email}</div>
+                    </div>
+                    <button
+                      onClick={() => { setShowUserMenu(false); navigate('/profile'); }}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '10px 16px',
+                        border: 'none',
+                        background: 'none',
+                        color: 'var(--text-primary)',
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        transition: 'background 0.15s',
+                        fontFamily: 'inherit',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-hover)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                    >
+                      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      Editar perfil
+                    </button>
+                    <button
+                      onClick={() => { setShowUserMenu(false); logout(); navigate('/login'); }}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '10px 16px',
+                        border: 'none',
+                        background: 'none',
+                        color: '#ef4444',
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        transition: 'background 0.15s',
+                        fontFamily: 'inherit',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                    >
+                      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Sair
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {/* Create workspace button */}
               <button
@@ -859,13 +1082,13 @@ export default function DashboardPage() {
                   padding: '9px 20px',
                   borderRadius: 10,
                   border: 'none',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: 'var(--gradient-primary)',
                   color: 'white',
                   fontSize: 13,
                   fontWeight: 600,
                   cursor: 'pointer',
                   transition: 'all 0.25s ease',
-                  boxShadow: '0 4px 16px rgba(102, 126, 234, 0.25)',
+                  boxShadow: 'var(--shadow-glow)',
                   fontFamily: 'inherit',
                 }}
               >
@@ -878,44 +1101,53 @@ export default function DashboardPage() {
           </div>
 
           {isLoading || boardQueries.isLoading ? (
-            <div style={{ textAlign: 'center', padding: '48px 0' }}>
-              <div style={{
-                display: 'inline-block',
-                width: 48,
-                height: 48,
-                borderRadius: '50%',
-                border: '2px solid transparent',
-                borderBottomColor: '#667eea',
-                animation: 'dp-spin 1s linear infinite',
-              }} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div
+                  key={i}
+                  className="animate-pulse"
+                  style={{
+                    borderRadius: 16,
+                    background: 'var(--surface-card-solid)',
+                    border: '1px solid var(--border-subtle)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div style={{ height: 100, background: `linear-gradient(135deg, rgba(102, 126, 234, ${0.08 + i * 0.02}), rgba(118, 75, 162, ${0.05 + i * 0.02}))` }} />
+                  <div style={{ padding: '14px 16px' }}>
+                    <div style={{ height: 14, borderRadius: 6, background: 'var(--border-visible)', width: `${50 + i * 8}%`, marginBottom: 8 }} />
+                    <div style={{ height: 10, borderRadius: 4, background: 'var(--border-subtle)', width: '40%' }} />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : workspaces.length === 0 ? (
             /* ===== EMPTY STATE ===== */
             <div style={{
               textAlign: 'center',
               padding: '80px 40px',
-              background: 'rgba(25, 28, 40, 0.3)',
+              background: 'var(--surface-card-solid)',
               borderRadius: 20,
-              border: '1px dashed rgba(102, 126, 234, 0.12)',
+              border: '1px dashed var(--accent-bg-medium)',
             }}>
               <div style={{
                 width: 72,
                 height: 72,
                 borderRadius: 20,
-                background: 'rgba(102, 126, 234, 0.08)',
+                background: 'var(--accent-bg-subtle)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 20px',
               }}>
-                <svg width="36" height="36" fill="none" stroke="#667eea" viewBox="0 0 24 24" style={{ opacity: 0.6 }}>
+                <svg width="36" height="36" fill="none" stroke="var(--accent)" viewBox="0 0 24 24" style={{ opacity: 0.6 }}>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
                 </svg>
               </div>
-              <div style={{ fontSize: 18, fontWeight: 600, color: '#e4e6eb', marginBottom: 8 }}>
+              <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
                 Nenhum workspace encontrado
               </div>
-              <div style={{ fontSize: 14, color: '#6b7084', marginBottom: 24, maxWidth: 360, marginLeft: 'auto', marginRight: 'auto' }}>
+              <div style={{ fontSize: 14, color: 'var(--text-disabled)', marginBottom: 24, maxWidth: 360, marginLeft: 'auto', marginRight: 'auto' }}>
                 Crie seu primeiro workspace para organizar seus boards e tarefas.
               </div>
               <button
@@ -927,13 +1159,13 @@ export default function DashboardPage() {
                   padding: '12px 28px',
                   borderRadius: 12,
                   border: 'none',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: 'var(--gradient-primary)',
                   color: 'white',
                   fontSize: 14,
                   fontWeight: 600,
                   cursor: 'pointer',
                   transition: 'all 0.25s ease',
-                  boxShadow: '0 4px 20px rgba(102, 126, 234, 0.3)',
+                  boxShadow: 'var(--shadow-glow)',
                   fontFamily: 'inherit',
                 }}
               >
@@ -959,8 +1191,8 @@ export default function DashboardPage() {
                   flex: 1,
                   padding: '16px 20px',
                   borderRadius: 14,
-                  background: 'rgba(25, 28, 40, 0.4)',
-                  border: '1px solid rgba(102, 126, 234, 0.06)',
+                  background: 'var(--surface-card-solid)',
+                  border: '1px solid var(--border-accent)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 14,
@@ -970,15 +1202,15 @@ export default function DashboardPage() {
                     width: 40, height: 40, borderRadius: 10,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     flexShrink: 0,
-                    background: 'rgba(102, 126, 234, 0.1)', color: '#667eea',
+                    background: 'var(--accent-bg)', color: 'var(--accent)',
                   }}>
                     <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                   </div>
                   <div>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: '#e4e6eb', lineHeight: 1 }}>{workspaces.length}</div>
-                    <div style={{ fontSize: 12, color: '#6b7084', marginTop: 2 }}>Workspaces</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>{workspaces.length}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-disabled)', marginTop: 2 }}>Workspaces</div>
                   </div>
                 </div>
 
@@ -987,8 +1219,8 @@ export default function DashboardPage() {
                   flex: 1,
                   padding: '16px 20px',
                   borderRadius: 14,
-                  background: 'rgba(25, 28, 40, 0.4)',
-                  border: '1px solid rgba(102, 126, 234, 0.06)',
+                  background: 'var(--surface-card-solid)',
+                  border: '1px solid var(--border-accent)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 14,
@@ -1005,8 +1237,8 @@ export default function DashboardPage() {
                     </svg>
                   </div>
                   <div>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: '#e4e6eb', lineHeight: 1 }}>{totalBoards}</div>
-                    <div style={{ fontSize: 12, color: '#6b7084', marginTop: 2 }}>Boards</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>{totalBoards}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-disabled)', marginTop: 2 }}>Boards</div>
                   </div>
                 </div>
 
@@ -1015,8 +1247,8 @@ export default function DashboardPage() {
                   flex: 1,
                   padding: '16px 20px',
                   borderRadius: 14,
-                  background: 'rgba(25, 28, 40, 0.4)',
-                  border: '1px solid rgba(102, 126, 234, 0.06)',
+                  background: 'var(--surface-card-solid)',
+                  border: '1px solid var(--border-accent)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 14,
@@ -1033,8 +1265,8 @@ export default function DashboardPage() {
                     </svg>
                   </div>
                   <div>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: '#e4e6eb', lineHeight: 1 }}>-</div>
-                    <div style={{ fontSize: 12, color: '#6b7084', marginTop: 2 }}>Tarefas ativas</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>{activeTasks}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-disabled)', marginTop: 2 }}>Tarefas ativas</div>
                   </div>
                 </div>
 
@@ -1043,8 +1275,8 @@ export default function DashboardPage() {
                   flex: 1,
                   padding: '16px 20px',
                   borderRadius: 14,
-                  background: 'rgba(25, 28, 40, 0.4)',
-                  border: '1px solid rgba(102, 126, 234, 0.06)',
+                  background: 'var(--surface-card-solid)',
+                  border: '1px solid var(--border-accent)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 14,
@@ -1061,18 +1293,19 @@ export default function DashboardPage() {
                     </svg>
                   </div>
                   <div>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: '#e4e6eb', lineHeight: 1 }}>{favoriteBoards.length}</div>
-                    <div style={{ fontSize: 12, color: '#6b7084', marginTop: 2 }}>Favoritos</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>{favoriteBoards.length}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-disabled)', marginTop: 2 }}>Favoritos</div>
                   </div>
                 </div>
               </div>
 
               {/* ===== FAVORITES SECTION ===== */}
               {favoriteBoardObjects.length > 0 && (
-                <div style={{
+                <div id="section-favorites" style={{
                   animation: 'dp-fadeInUp 0.4s ease-out forwards',
                   animationDelay: '0.1s',
                   opacity: 0,
+                  scrollMarginTop: 20,
                 }}>
                   <div style={{
                     display: 'flex',
@@ -1086,9 +1319,9 @@ export default function DashboardPage() {
                       gap: 10,
                       fontSize: 15,
                       fontWeight: 600,
-                      color: '#e4e6eb',
+                      color: 'var(--text-primary)',
                     }}>
-                      <svg width="18" height="18" fill="#667eea" viewBox="0 0 24 24">
+                      <svg width="18" height="18" fill="var(--accent)" viewBox="0 0 24 24">
                         <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                       </svg>
                       Favoritos
@@ -1166,6 +1399,7 @@ export default function DashboardPage() {
               )}
 
               {/* ===== WORKSPACE SECTIONS (Drag & Drop) ===== */}
+              <div id="section-workspaces" style={{ scrollMarginTop: 20 }} />
               <DragDropContext onDragEnd={handleWorkspaceDragEnd}>
                 <Droppable droppableId="workspaces" type="WORKSPACE">
                   {(provided) => (
@@ -1223,16 +1457,16 @@ export default function DashboardPage() {
                                       title="Arrastar para reordenar"
                                     >
                                       <div style={{ display: 'flex', gap: 3 }}>
-                                        <div style={{ width: 3, height: 3, borderRadius: '50%', background: '#5a5f73' }} />
-                                        <div style={{ width: 3, height: 3, borderRadius: '50%', background: '#5a5f73' }} />
+                                        <div style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--text-dimmed)' }} />
+                                        <div style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--text-dimmed)' }} />
                                       </div>
                                       <div style={{ display: 'flex', gap: 3 }}>
-                                        <div style={{ width: 3, height: 3, borderRadius: '50%', background: '#5a5f73' }} />
-                                        <div style={{ width: 3, height: 3, borderRadius: '50%', background: '#5a5f73' }} />
+                                        <div style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--text-dimmed)' }} />
+                                        <div style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--text-dimmed)' }} />
                                       </div>
                                       <div style={{ display: 'flex', gap: 3 }}>
-                                        <div style={{ width: 3, height: 3, borderRadius: '50%', background: '#5a5f73' }} />
-                                        <div style={{ width: 3, height: 3, borderRadius: '50%', background: '#5a5f73' }} />
+                                        <div style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--text-dimmed)' }} />
+                                        <div style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--text-dimmed)' }} />
                                       </div>
                                     </div>
 
@@ -1285,17 +1519,17 @@ export default function DashboardPage() {
                                           style={{
                                             fontSize: 18,
                                             fontWeight: 600,
-                                            color: '#e4e6eb',
+                                            color: 'var(--text-primary)',
                                             padding: '4px 8px',
                                             borderRadius: 6,
                                             background: 'transparent',
-                                            border: '2px solid #667eea',
+                                            border: '2px solid var(--accent)',
                                             outline: 'none',
                                             fontFamily: 'inherit',
                                           }}
                                         />
                                       ) : (
-                                        <span style={{ fontSize: 18, fontWeight: 600, color: '#e4e6eb' }}>
+                                        <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>
                                           {workspace.name}
                                         </span>
                                       )}
@@ -1305,7 +1539,7 @@ export default function DashboardPage() {
                                           background: 'none',
                                           border: 'none',
                                           cursor: 'pointer',
-                                          color: isFavorite ? '#fbbf24' : '#5a5f73',
+                                          color: isFavorite ? '#fbbf24' : 'var(--text-dimmed)',
                                           transition: 'all 0.2s',
                                           padding: 0,
                                           display: 'flex',
@@ -1327,27 +1561,93 @@ export default function DashboardPage() {
                                     {/* Board count badge */}
                                     <span style={{
                                       fontSize: 12,
-                                      color: '#5a5f73',
-                                      background: 'rgba(90, 95, 115, 0.15)',
+                                      color: 'var(--text-dimmed)',
+                                      background: 'var(--surface-subtle)',
                                       padding: '3px 10px',
                                       borderRadius: 12,
                                     }}>{allWsBoards.length} boards</span>
 
                                     {/* Member avatars */}
                                     <div style={{ display: 'flex', alignItems: 'center', marginLeft: 8 }}>
-                                      <div style={{
-                                        width: 24,
-                                        height: 24,
-                                        borderRadius: '50%',
-                                        border: '2px solid #0f1117',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: 9,
-                                        fontWeight: 700,
-                                        color: 'white',
-                                        background: 'linear-gradient(135deg, #667eea, #764ba2)',
-                                      }}>{userInitials}</div>
+                                      {(() => {
+                                        // Build unique members list: owner + workspace members
+                                        const allMembers: { id: string; name: string; avatarUrl?: string | null }[] = [];
+                                        if (workspace.owner) {
+                                          allMembers.push(workspace.owner);
+                                        }
+                                        workspace.members?.forEach((wm: any) => {
+                                          if (wm.user && !allMembers.some(m => m.id === wm.user.id)) {
+                                            allMembers.push(wm.user);
+                                          }
+                                        });
+                                        const maxShow = 4;
+                                        const shown = allMembers.slice(0, maxShow);
+                                        const extra = allMembers.length - maxShow;
+                                        return (
+                                          <>
+                                            {shown.map((member, mIdx) => (
+                                              member.avatarUrl ? (
+                                                <img
+                                                  key={member.id}
+                                                  src={member.avatarUrl}
+                                                  alt={member.name}
+                                                  title={member.name}
+                                                  style={{
+                                                    width: 24,
+                                                    height: 24,
+                                                    borderRadius: '50%',
+                                                    border: '2px solid var(--surface-base)',
+                                                    objectFit: 'cover',
+                                                    marginLeft: mIdx > 0 ? -6 : 0,
+                                                    zIndex: shown.length - mIdx,
+                                                    position: 'relative',
+                                                  }}
+                                                />
+                                              ) : (
+                                                <div
+                                                  key={member.id}
+                                                  title={member.name}
+                                                  style={{
+                                                    width: 24,
+                                                    height: 24,
+                                                    borderRadius: '50%',
+                                                    border: '2px solid var(--surface-base)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: 9,
+                                                    fontWeight: 700,
+                                                    color: 'white',
+                                                    background: 'var(--gradient-primary)',
+                                                    marginLeft: mIdx > 0 ? -6 : 0,
+                                                    zIndex: shown.length - mIdx,
+                                                    position: 'relative',
+                                                    flexShrink: 0,
+                                                  }}
+                                                >{getInitials(member.name)}</div>
+                                              )
+                                            ))}
+                                            {extra > 0 && (
+                                              <div style={{
+                                                width: 24,
+                                                height: 24,
+                                                borderRadius: '50%',
+                                                border: '2px solid var(--surface-base)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: 9,
+                                                fontWeight: 700,
+                                                color: 'var(--text-faint)',
+                                                background: 'var(--border-visible)',
+                                                marginLeft: -6,
+                                                position: 'relative',
+                                                flexShrink: 0,
+                                              }}>+{extra}</div>
+                                            )}
+                                          </>
+                                        );
+                                      })()}
                                     </div>
 
                                     {/* Three-dot menu */}
@@ -1361,7 +1661,7 @@ export default function DashboardPage() {
                                           borderRadius: 8,
                                           border: 'none',
                                           background: 'transparent',
-                                          color: '#5a5f73',
+                                          color: 'var(--text-dimmed)',
                                           cursor: 'pointer',
                                           display: 'flex',
                                           alignItems: 'center',
@@ -1385,12 +1685,12 @@ export default function DashboardPage() {
                                             marginTop: 8,
                                             width: 192,
                                             borderRadius: 12,
-                                            boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+                                            boxShadow: 'var(--shadow-lg)',
                                             zIndex: 20,
                                             padding: '6px 0',
-                                            background: 'rgba(25, 28, 40, 0.95)',
+                                            background: 'var(--surface-dropdown)',
                                             backdropFilter: 'blur(20px)',
-                                            border: '1px solid rgba(102, 126, 234, 0.1)',
+                                            border: '1px solid var(--border-accent)',
                                           }}>
                                             <button
                                               onClick={() => {
@@ -1402,7 +1702,7 @@ export default function DashboardPage() {
                                                 padding: '8px 16px',
                                                 textAlign: 'left',
                                                 fontSize: 13,
-                                                color: '#e4e6eb',
+                                                color: 'var(--text-primary)',
                                                 background: 'none',
                                                 border: 'none',
                                                 cursor: 'pointer',
@@ -1412,7 +1712,7 @@ export default function DashboardPage() {
                                                 fontFamily: 'inherit',
                                                 transition: 'background 0.15s',
                                               }}
-                                              onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
+                                              onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'var(--surface-subtle)'; }}
                                               onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'none'; }}
                                             >
                                               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1430,7 +1730,7 @@ export default function DashboardPage() {
                                                 padding: '8px 16px',
                                                 textAlign: 'left',
                                                 fontSize: 13,
-                                                color: '#e4e6eb',
+                                                color: 'var(--text-primary)',
                                                 background: 'none',
                                                 border: 'none',
                                                 cursor: 'pointer',
@@ -1440,7 +1740,7 @@ export default function DashboardPage() {
                                                 fontFamily: 'inherit',
                                                 transition: 'background 0.15s',
                                               }}
-                                              onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
+                                              onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'var(--surface-subtle)'; }}
                                               onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'none'; }}
                                             >
                                               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1449,8 +1749,14 @@ export default function DashboardPage() {
                                               Gerenciar membros
                                             </button>
                                             <button
-                                              onClick={() => {
-                                                if (confirm('Tem certeza que deseja deletar este workspace? Todos os boards serao perdidos!')) {
+                                              onClick={async () => {
+                                                const confirmed = await confirmAction({
+                                                  title: 'Deletar workspace',
+                                                  message: 'Tem certeza que deseja deletar este workspace? Todos os boards serao perdidos!',
+                                                  confirmText: 'Deletar',
+                                                  variant: 'danger',
+                                                });
+                                                if (confirmed) {
                                                   deleteWorkspaceMutation.mutate(workspace.id);
                                                 }
                                                 setWorkspaceMenuOpen(null);
@@ -1573,17 +1879,84 @@ export default function DashboardPage() {
                                                 alignItems: 'center',
                                                 justifyContent: 'space-between',
                                               }}>
-                                                <div style={{
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  gap: 4,
-                                                  fontSize: 11,
-                                                  color: 'rgba(255,255,255,0.6)',
-                                                }}>
-                                                  <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                                                  </svg>
-                                                  Atualizado recentemente
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                  <div style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 4,
+                                                    fontSize: 11,
+                                                    color: 'rgba(255,255,255,0.6)',
+                                                  }}>
+                                                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                                                    </svg>
+                                                    Atualizado recentemente
+                                                  </div>
+                                                  {board.members && board.members.length > 0 && (
+                                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                      {board.members.slice(0, 3).map((bm: any, mIdx: number) => (
+                                                        bm.user?.avatarUrl ? (
+                                                          <img
+                                                            key={bm.id}
+                                                            src={bm.user.avatarUrl}
+                                                            alt={bm.user.name}
+                                                            title={bm.user.name}
+                                                            style={{
+                                                              width: 20,
+                                                              height: 20,
+                                                              borderRadius: '50%',
+                                                              border: '1.5px solid rgba(0,0,0,0.4)',
+                                                              objectFit: 'cover',
+                                                              marginLeft: mIdx > 0 ? -5 : 0,
+                                                              zIndex: 3 - mIdx,
+                                                              position: 'relative',
+                                                            }}
+                                                          />
+                                                        ) : (
+                                                          <div
+                                                            key={bm.id}
+                                                            title={bm.user?.name}
+                                                            style={{
+                                                              width: 20,
+                                                              height: 20,
+                                                              borderRadius: '50%',
+                                                              border: '1.5px solid rgba(0,0,0,0.4)',
+                                                              display: 'flex',
+                                                              alignItems: 'center',
+                                                              justifyContent: 'center',
+                                                              fontSize: 8,
+                                                              fontWeight: 700,
+                                                              color: 'white',
+                                                              background: 'rgba(255,255,255,0.2)',
+                                                              backdropFilter: 'blur(4px)',
+                                                              marginLeft: mIdx > 0 ? -5 : 0,
+                                                              zIndex: 3 - mIdx,
+                                                              position: 'relative',
+                                                              flexShrink: 0,
+                                                            }}
+                                                          >{getInitials(bm.user?.name || '?')}</div>
+                                                        )
+                                                      ))}
+                                                      {board.members.length > 3 && (
+                                                        <div style={{
+                                                          width: 20,
+                                                          height: 20,
+                                                          borderRadius: '50%',
+                                                          border: '1.5px solid rgba(0,0,0,0.4)',
+                                                          display: 'flex',
+                                                          alignItems: 'center',
+                                                          justifyContent: 'center',
+                                                          fontSize: 8,
+                                                          fontWeight: 700,
+                                                          color: 'rgba(255,255,255,0.7)',
+                                                          background: 'rgba(255,255,255,0.15)',
+                                                          marginLeft: -5,
+                                                          position: 'relative',
+                                                          flexShrink: 0,
+                                                        }}>+{board.members.length - 3}</div>
+                                                      )}
+                                                    </div>
+                                                  )}
                                                 </div>
                                                 <button
                                                   onClick={(e) => {
@@ -1635,11 +2008,11 @@ export default function DashboardPage() {
                                                 zIndex: 20,
                                                 width: 192,
                                                 borderRadius: 12,
-                                                boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+                                                boxShadow: 'var(--shadow-lg)',
                                                 padding: '6px 0',
-                                                background: 'rgba(25, 28, 40, 0.95)',
+                                                background: 'var(--surface-dropdown)',
                                                 backdropFilter: 'blur(20px)',
-                                                border: '1px solid rgba(102, 126, 234, 0.1)',
+                                                border: '1px solid var(--border-accent)',
                                               }}>
                                                 <button
                                                   onClick={() => {
@@ -1651,7 +2024,7 @@ export default function DashboardPage() {
                                                     padding: '8px 16px',
                                                     textAlign: 'left',
                                                     fontSize: 13,
-                                                    color: '#e4e6eb',
+                                                    color: 'var(--text-primary)',
                                                     background: 'none',
                                                     border: 'none',
                                                     cursor: 'pointer',
@@ -1661,7 +2034,7 @@ export default function DashboardPage() {
                                                     fontFamily: 'inherit',
                                                     transition: 'background 0.15s',
                                                   }}
-                                                  onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
+                                                  onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'var(--surface-subtle)'; }}
                                                   onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'none'; }}
                                                 >
                                                   <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1670,8 +2043,14 @@ export default function DashboardPage() {
                                                   Editar board
                                                 </button>
                                                 <button
-                                                  onClick={() => {
-                                                    if (confirm('Tem certeza que deseja deletar este board?')) {
+                                                  onClick={async () => {
+                                                    const confirmed = await confirmAction({
+                                                      title: 'Deletar board',
+                                                      message: 'Tem certeza que deseja deletar este board? Esta acao nao pode ser desfeita.',
+                                                      confirmText: 'Deletar',
+                                                      variant: 'danger',
+                                                    });
+                                                    if (confirmed) {
                                                       deleteBoardMutation.mutate(board.id);
                                                     }
                                                     setBoardMenuOpen(null);
@@ -1712,8 +2091,8 @@ export default function DashboardPage() {
                                       className="dp-board-card-new"
                                       style={{
                                         borderRadius: 12,
-                                        border: '1.5px dashed rgba(102, 126, 234, 0.2)',
-                                        background: 'rgba(25, 28, 40, 0.3)',
+                                        border: '1.5px dashed var(--border-accent-strong)',
+                                        background: 'var(--surface-card-solid)',
                                         display: 'flex',
                                         flexDirection: 'column',
                                         alignItems: 'center',
@@ -1730,19 +2109,21 @@ export default function DashboardPage() {
                                         width: 36,
                                         height: 36,
                                         borderRadius: 10,
-                                        background: 'rgba(102, 126, 234, 0.1)',
+                                        background: 'var(--accent-bg)',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         transition: 'all 0.3s',
                                       }}>
-                                        <svg width="18" height="18" fill="none" stroke="#667eea" viewBox="0 0 24 24">
+                                        <svg width="18" height="18" fill="none" stroke="var(--accent)" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
                                         </svg>
                                       </div>
-                                      <span style={{ fontSize: 12, fontWeight: 500, color: '#5a5f73' }}>Novo board</span>
+                                      <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-dimmed)' }}>Novo board</span>
                                     </button>
                                   </div>
+
+                                  {/* Activity Feed moved to modal - triggered from sidebar */}
                                 </div>
                               </div>
                             )}
@@ -1774,7 +2155,7 @@ export default function DashboardPage() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+              backgroundColor: 'var(--overlay-bg)',
               backdropFilter: 'blur(8px)',
             }}
             onClick={() => setShowModal(false)}
@@ -1785,16 +2166,16 @@ export default function DashboardPage() {
                 padding: 32,
                 maxWidth: 420,
                 width: '100%',
-                boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
-                background: 'rgba(25, 28, 40, 0.95)',
+                boxShadow: 'var(--modal-shadow)',
+                background: 'var(--surface-dropdown)',
                 backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(102, 126, 234, 0.1)',
+                border: '1px solid var(--border-accent)',
                 margin: '0 16px',
               }}
               onClick={(e) => e.stopPropagation()}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-                <h3 style={{ fontSize: 20, fontWeight: 700, color: '#e4e6eb', margin: 0 }}>
+                <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
                   Criar Workspace
                 </h3>
                 <button
@@ -1806,8 +2187,8 @@ export default function DashboardPage() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: 'rgba(45, 49, 66, 0.6)',
-                    color: '#8b8fa3',
+                    background: 'var(--surface-sidebar-input)',
+                    color: 'var(--text-faint)',
                     border: 'none',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
@@ -1827,7 +2208,7 @@ export default function DashboardPage() {
                     fontWeight: 600,
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
-                    color: '#8b8fa3',
+                    color: 'var(--text-faint)',
                     marginBottom: 8,
                   }}>Nome do Workspace *</label>
                   <input
@@ -1838,9 +2219,9 @@ export default function DashboardPage() {
                       width: '100%',
                       padding: '12px 16px',
                       borderRadius: 10,
-                      background: 'rgba(15, 17, 23, 0.6)',
-                      color: '#e4e6eb',
-                      border: '2px solid rgba(102, 126, 234, 0.1)',
+                      background: 'var(--surface-input)',
+                      color: 'var(--text-primary)',
+                      border: '2px solid var(--border-accent)',
                       outline: 'none',
                       fontSize: 14,
                       fontFamily: 'inherit',
@@ -1859,7 +2240,7 @@ export default function DashboardPage() {
                     fontWeight: 600,
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
-                    color: '#8b8fa3',
+                    color: 'var(--text-faint)',
                     marginBottom: 8,
                   }}>Descricao (opcional)</label>
                   <textarea
@@ -1869,9 +2250,9 @@ export default function DashboardPage() {
                       width: '100%',
                       padding: '12px 16px',
                       borderRadius: 10,
-                      background: 'rgba(15, 17, 23, 0.6)',
-                      color: '#e4e6eb',
-                      border: '2px solid rgba(102, 126, 234, 0.1)',
+                      background: 'var(--surface-input)',
+                      color: 'var(--text-primary)',
+                      border: '2px solid var(--border-accent)',
                       outline: 'none',
                       fontSize: 14,
                       fontFamily: 'inherit',
@@ -1892,9 +2273,9 @@ export default function DashboardPage() {
                       padding: '12px 16px',
                       borderRadius: 10,
                       fontWeight: 500,
-                      color: '#8b8fa3',
-                      background: 'rgba(45, 49, 66, 0.4)',
-                      border: '1px solid rgba(102, 126, 234, 0.1)',
+                      color: 'var(--text-faint)',
+                      background: 'var(--surface-sidebar-input)',
+                      border: '1px solid var(--border-accent)',
                       cursor: 'pointer',
                       fontSize: 14,
                       fontFamily: 'inherit',
@@ -1912,7 +2293,7 @@ export default function DashboardPage() {
                       borderRadius: 10,
                       fontWeight: 600,
                       color: 'white',
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      background: 'var(--gradient-primary)',
                       border: 'none',
                       cursor: createMutation.isPending || !name.trim() ? 'not-allowed' : 'pointer',
                       fontSize: 14,
@@ -1944,31 +2325,33 @@ export default function DashboardPage() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+              backgroundColor: 'var(--overlay-bg)',
               backdropFilter: 'blur(8px)',
             }}
-            onClick={() => setShowCreateBoardModal(null)}
+            onClick={() => { setShowCreateBoardModal(null); setSelectedTemplate(null); }}
           >
             <div
               style={{
                 borderRadius: 16,
                 padding: 32,
-                maxWidth: 420,
+                maxWidth: 480,
                 width: '100%',
-                boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
-                background: 'rgba(25, 28, 40, 0.95)',
+                boxShadow: 'var(--modal-shadow)',
+                background: 'var(--surface-dropdown)',
                 backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(102, 126, 234, 0.1)',
+                border: '1px solid var(--border-accent)',
                 margin: '0 16px',
+                maxHeight: '90vh',
+                overflowY: 'auto',
               }}
               onClick={(e) => e.stopPropagation()}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-                <h3 style={{ fontSize: 20, fontWeight: 700, color: '#e4e6eb', margin: 0 }}>
+                <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
                   Criar Board
                 </h3>
                 <button
-                  onClick={() => setShowCreateBoardModal(null)}
+                  onClick={() => { setShowCreateBoardModal(null); setSelectedTemplate(null); }}
                   style={{
                     width: 32,
                     height: 32,
@@ -1976,8 +2359,8 @@ export default function DashboardPage() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: 'rgba(45, 49, 66, 0.6)',
-                    color: '#8b8fa3',
+                    background: 'var(--surface-sidebar-input)',
+                    color: 'var(--text-faint)',
                     border: 'none',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
@@ -1997,10 +2380,12 @@ export default function DashboardPage() {
                       workspaceId: showCreateBoardModal.workspaceId,
                       name: boardName.trim(),
                       backgroundColor: boardColor,
+                      templateId: selectedTemplate,
                     });
                   }
                 }}
               >
+                {/* Template Selection */}
                 <div style={{ marginBottom: 20 }}>
                   <label style={{
                     display: 'block',
@@ -2008,7 +2393,69 @@ export default function DashboardPage() {
                     fontWeight: 600,
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
-                    color: '#8b8fa3',
+                    color: 'var(--text-faint)',
+                    marginBottom: 8,
+                  }}>Template</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    {/* Blank option */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTemplate(null)}
+                      style={{
+                        padding: '10px 8px',
+                        borderRadius: 10,
+                        background: !selectedTemplate ? 'var(--accent-bg-medium)' : 'var(--surface-input)',
+                        border: !selectedTemplate ? '2px solid var(--accent)' : '2px solid var(--border-accent)',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ fontSize: 20, marginBottom: 4 }}>📄</div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: !selectedTemplate ? 'var(--accent)' : 'var(--text-primary)' }}>Em branco</div>
+                    </button>
+                    {BOARD_TEMPLATES.map((tpl) => (
+                      <button
+                        key={tpl.id}
+                        type="button"
+                        onClick={() => setSelectedTemplate(tpl.id)}
+                        style={{
+                          padding: '10px 8px',
+                          borderRadius: 10,
+                          background: selectedTemplate === tpl.id ? 'var(--accent-bg-medium)' : 'var(--surface-input)',
+                          border: selectedTemplate === tpl.id ? '2px solid var(--accent)' : '2px solid var(--border-accent)',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                        }}
+                        title={tpl.lists.join(' → ')}
+                      >
+                        <div style={{ fontSize: 20, marginBottom: 4 }}>{tpl.icon}</div>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: selectedTemplate === tpl.id ? 'var(--accent)' : 'var(--text-primary)' }}>{tpl.name}</div>
+                      </button>
+                    ))}
+                  </div>
+                  {selectedTemplate && (
+                    <div style={{
+                      marginTop: 8,
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      background: 'var(--accent-bg)',
+                      fontSize: 11,
+                      color: 'var(--text-secondary)',
+                    }}>
+                      <span style={{ fontWeight: 600, color: 'var(--accent)' }}>Listas: </span>
+                      {BOARD_TEMPLATES.find(t => t.id === selectedTemplate)?.lists.join(' → ')}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                    color: 'var(--text-faint)',
                     marginBottom: 8,
                   }}>Nome do Board *</label>
                   <input
@@ -2019,9 +2466,9 @@ export default function DashboardPage() {
                       width: '100%',
                       padding: '12px 16px',
                       borderRadius: 10,
-                      background: 'rgba(15, 17, 23, 0.6)',
-                      color: '#e4e6eb',
-                      border: '2px solid rgba(102, 126, 234, 0.1)',
+                      background: 'var(--surface-input)',
+                      color: 'var(--text-primary)',
+                      border: '2px solid var(--border-accent)',
                       outline: 'none',
                       fontSize: 14,
                       fontFamily: 'inherit',
@@ -2040,7 +2487,7 @@ export default function DashboardPage() {
                     fontWeight: 600,
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
-                    color: '#8b8fa3',
+                    color: 'var(--text-faint)',
                     marginBottom: 8,
                   }}>Cor do Board</label>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -2055,7 +2502,7 @@ export default function DashboardPage() {
                           borderRadius: 8,
                           background: color,
                           border: boardColor === color ? '3px solid white' : 'none',
-                          boxShadow: boardColor === color ? '0 0 0 2px #667eea' : 'none',
+                          boxShadow: boardColor === color ? '0 0 0 2px var(--accent)' : 'none',
                           cursor: 'pointer',
                           transition: 'all 0.2s',
                         }}
@@ -2067,15 +2514,15 @@ export default function DashboardPage() {
                 <div style={{ display: 'flex', gap: 12, paddingTop: 8 }}>
                   <button
                     type="button"
-                    onClick={() => setShowCreateBoardModal(null)}
+                    onClick={() => { setShowCreateBoardModal(null); setSelectedTemplate(null); }}
                     style={{
                       flex: 1,
                       padding: '12px 16px',
                       borderRadius: 10,
                       fontWeight: 500,
-                      color: '#8b8fa3',
-                      background: 'rgba(45, 49, 66, 0.4)',
-                      border: '1px solid rgba(102, 126, 234, 0.1)',
+                      color: 'var(--text-faint)',
+                      background: 'var(--surface-sidebar-input)',
+                      border: '1px solid var(--border-accent)',
                       cursor: 'pointer',
                       fontSize: 14,
                       fontFamily: 'inherit',
@@ -2093,7 +2540,7 @@ export default function DashboardPage() {
                       borderRadius: 10,
                       fontWeight: 600,
                       color: 'white',
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      background: 'var(--gradient-primary)',
                       border: 'none',
                       cursor: createBoardMutation.isPending || !boardName.trim() ? 'not-allowed' : 'pointer',
                       fontSize: 14,
@@ -2125,7 +2572,7 @@ export default function DashboardPage() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+              backgroundColor: 'var(--overlay-bg)',
               backdropFilter: 'blur(8px)',
             }}
             onClick={() => setEditingBoard(null)}
@@ -2136,16 +2583,16 @@ export default function DashboardPage() {
                 padding: 32,
                 maxWidth: 420,
                 width: '100%',
-                boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
-                background: 'rgba(25, 28, 40, 0.95)',
+                boxShadow: 'var(--modal-shadow)',
+                background: 'var(--surface-dropdown)',
                 backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(102, 126, 234, 0.1)',
+                border: '1px solid var(--border-accent)',
                 margin: '0 16px',
               }}
               onClick={(e) => e.stopPropagation()}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-                <h3 style={{ fontSize: 20, fontWeight: 700, color: '#e4e6eb', margin: 0 }}>
+                <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
                   Editar Board
                 </h3>
                 <button
@@ -2157,8 +2604,8 @@ export default function DashboardPage() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: 'rgba(45, 49, 66, 0.6)',
-                    color: '#8b8fa3',
+                    background: 'var(--surface-sidebar-input)',
+                    color: 'var(--text-faint)',
                     border: 'none',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
@@ -2191,7 +2638,7 @@ export default function DashboardPage() {
                     fontWeight: 600,
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
-                    color: '#8b8fa3',
+                    color: 'var(--text-faint)',
                     marginBottom: 8,
                   }}>Nome do Board *</label>
                   <input
@@ -2202,9 +2649,9 @@ export default function DashboardPage() {
                       width: '100%',
                       padding: '12px 16px',
                       borderRadius: 10,
-                      background: 'rgba(15, 17, 23, 0.6)',
-                      color: '#e4e6eb',
-                      border: '2px solid rgba(102, 126, 234, 0.1)',
+                      background: 'var(--surface-input)',
+                      color: 'var(--text-primary)',
+                      border: '2px solid var(--border-accent)',
                       outline: 'none',
                       fontSize: 14,
                       fontFamily: 'inherit',
@@ -2222,7 +2669,7 @@ export default function DashboardPage() {
                     fontWeight: 600,
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
-                    color: '#8b8fa3',
+                    color: 'var(--text-faint)',
                     marginBottom: 8,
                   }}>Cor do Board</label>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -2237,7 +2684,7 @@ export default function DashboardPage() {
                           borderRadius: 8,
                           background: color,
                           border: editingBoard.color === color ? '3px solid white' : 'none',
-                          boxShadow: editingBoard.color === color ? '0 0 0 2px #667eea' : 'none',
+                          boxShadow: editingBoard.color === color ? '0 0 0 2px var(--accent)' : 'none',
                           cursor: 'pointer',
                           transition: 'all 0.2s',
                         }}
@@ -2255,9 +2702,9 @@ export default function DashboardPage() {
                       padding: '12px 16px',
                       borderRadius: 10,
                       fontWeight: 500,
-                      color: '#8b8fa3',
-                      background: 'rgba(45, 49, 66, 0.4)',
-                      border: '1px solid rgba(102, 126, 234, 0.1)',
+                      color: 'var(--text-faint)',
+                      background: 'var(--surface-sidebar-input)',
+                      border: '1px solid var(--border-accent)',
                       cursor: 'pointer',
                       fontSize: 14,
                       fontFamily: 'inherit',
@@ -2275,7 +2722,7 @@ export default function DashboardPage() {
                       borderRadius: 10,
                       fontWeight: 600,
                       color: 'white',
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      background: 'var(--gradient-primary)',
                       border: 'none',
                       cursor: updateBoardMutation.isPending || !editingBoard.name.trim() ? 'not-allowed' : 'pointer',
                       fontSize: 14,
@@ -2301,6 +2748,19 @@ export default function DashboardPage() {
           onClose={() => setWorkspaceMembersModal(null)}
         />
       )}
+      {/* Notification Toast Provider */}
+      <NotificationProvider />
+      <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />
+      <WorkspaceActivityFeed
+        isOpen={showActivityModal}
+        onClose={() => setShowActivityModal(false)}
+        workspaces={workspaces.map(w => ({
+          id: w.id,
+          name: w.name,
+          boards: (boardQueries.data?.find(d => d.workspaceId === w.id)?.boards || []).map(b => ({ id: b.id, name: b.name })),
+        }))}
+      />
+      <ConfirmDialog />
     </>
   );
 }

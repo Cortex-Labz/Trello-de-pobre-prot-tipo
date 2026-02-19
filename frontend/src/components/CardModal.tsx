@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import ReactMarkdown from 'react-markdown';
 import { cardService } from '../services/cardService';
 import { commentService } from '../services/commentService';
 import { checklistService } from '../services/checklistService';
@@ -8,8 +9,8 @@ import { attachmentService } from '../services/attachmentService';
 import { activityService } from '../services/activityService';
 import type { Card, Label, BoardMember, Comment, Checklist, Attachment, Activity } from '../types';
 import { useAuthStore } from '../store/authStore';
+import { useConfirmModal } from '../hooks/useConfirmModal';
 import DatePicker from './common/DatePicker';
-import { renderTextWithLinks } from '../utils/linkify';
 import MentionInput from './common/MentionInput';
 import { renderTextWithLinksAndMentions } from '../utils/renderMentions';
 
@@ -32,6 +33,7 @@ export default function CardModal({
 }: CardModalProps) {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
+  const { confirm: confirmAction, ConfirmDialog } = useConfirmModal();
 
   // Get the updated card from the cache
   const boardData: any = queryClient.getQueryData(['board', boardId]);
@@ -45,13 +47,17 @@ export default function CardModal({
   const [dueDate, setDueDate] = useState(
     card.dueDate ? new Date(card.dueDate).toISOString().split('T')[0] : ''
   );
+  const [startDate, setStartDate] = useState(
+    card.startDate ? new Date(card.startDate).toISOString().split('T')[0] : ''
+  );
 
   // Update local state when card changes
   useEffect(() => {
     setTitle(card.title);
     setDescription(card.description || '');
     setDueDate(card.dueDate ? new Date(card.dueDate).toISOString().split('T')[0] : '');
-  }, [card.title, card.description, card.dueDate]);
+    setStartDate(card.startDate ? new Date(card.startDate).toISOString().split('T')[0] : '');
+  }, [card.title, card.description, card.dueDate, card.startDate]);
   const [newComment, setNewComment] = useState('');
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentContent, setEditingCommentContent] = useState('');
@@ -59,6 +65,10 @@ export default function CardModal({
   const [isAddingChecklist, setIsAddingChecklist] = useState(false);
   const [newItemTitle, setNewItemTitle] = useState<{ [key: string]: string }>({});
   const [isAddingItem, setIsAddingItem] = useState<{ [key: string]: boolean }>({});
+  const [editingChecklistId, setEditingChecklistId] = useState<string | null>(null);
+  const [editingChecklistTitle, setEditingChecklistTitle] = useState('');
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingItemTitle, setEditingItemTitle] = useState('');
   const [isLabelsDropdownOpen, setIsLabelsDropdownOpen] = useState(false);
   const [isCreatingLabel, setIsCreatingLabel] = useState(false);
   const [newLabelName, setNewLabelName] = useState('');
@@ -68,6 +78,11 @@ export default function CardModal({
   const [completionTimeUnit, setCompletionTimeUnit] = useState('minutes');
   const [showAllComments, setShowAllComments] = useState(false);
   const [showAllAttachments, setShowAllAttachments] = useState(false);
+  const [showActivities, setShowActivities] = useState(false);
+  const [showMoveMenu, setShowMoveMenu] = useState(false);
+  const [showCopyMenu, setShowCopyMenu] = useState(false);
+  const [selectedMoveListId, setSelectedMoveListId] = useState('');
+  const [selectedCopyListId, setSelectedCopyListId] = useState('');
 
   // Fetch comments
   const { data: commentsData } = useQuery({
@@ -97,6 +112,7 @@ export default function CardModal({
     setTitle(card.title);
     setDescription(card.description || '');
     setDueDate(card.dueDate ? new Date(card.dueDate).toISOString().split('T')[0] : '');
+    setStartDate(card.startDate ? new Date(card.startDate).toISOString().split('T')[0] : '');
   }, [card]);
 
   const updateCardMutation = useMutation({
@@ -127,6 +143,41 @@ export default function CardModal({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board', boardId] });
       onClose();
+    },
+  });
+
+  // Get board lists for move/copy
+  const boardLists = boardData?.board?.lists?.filter((l: any) => !l.isArchived) || [];
+
+  const moveCardMutation = useMutation({
+    mutationFn: (targetListId: string) => {
+      const targetList = boardLists.find((l: any) => l.id === targetListId);
+      const position = targetList?.cards?.length || 0;
+      return cardService.moveCard(card.id, { listId: targetListId, position });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+      setShowMoveMenu(false);
+      setSelectedMoveListId('');
+      onClose();
+    },
+  });
+
+  const copyCardMutation = useMutation({
+    mutationFn: (targetListId: string) => {
+      const targetList = boardLists.find((l: any) => l.id === targetListId);
+      const position = targetList?.cards?.length || 0;
+      return cardService.createCard({
+        listId: targetListId,
+        title: card.title + ' (copia)',
+        description: card.description,
+        position,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+      setShowCopyMenu(false);
+      setSelectedCopyListId('');
     },
   });
 
@@ -201,6 +252,26 @@ export default function CardModal({
       checklistService.updateChecklistItem(itemId, { isCompleted }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['checklists', card.id] });
+    },
+  });
+
+  const updateChecklistMutation = useMutation({
+    mutationFn: ({ checklistId, title }: { checklistId: string; title: string }) =>
+      checklistService.updateChecklist(checklistId, title),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checklists', card.id] });
+      setEditingChecklistId(null);
+      setEditingChecklistTitle('');
+    },
+  });
+
+  const updateChecklistItemMutation = useMutation({
+    mutationFn: ({ itemId, title }: { itemId: string; title: string }) =>
+      checklistService.updateChecklistItem(itemId, { title }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checklists', card.id] });
+      setEditingItemId(null);
+      setEditingItemTitle('');
     },
   });
 
@@ -362,8 +433,14 @@ export default function CardModal({
     }
   };
 
-  const handleDeleteAttachment = (attachmentId: string) => {
-    if (confirm('Tem certeza que deseja deletar este anexo?')) {
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    const confirmed = await confirmAction({
+      title: 'Deletar anexo',
+      message: 'Tem certeza que deseja deletar este anexo?',
+      confirmText: 'Deletar',
+      variant: 'danger',
+    });
+    if (confirmed) {
       deleteAttachmentMutation.mutate(attachmentId);
     }
   };
@@ -418,8 +495,14 @@ export default function CardModal({
     }
   };
 
-  const handleDeleteComment = (commentId: string) => {
-    if (confirm('Tem certeza que deseja deletar este comentário?')) {
+  const handleDeleteComment = async (commentId: string) => {
+    const confirmed = await confirmAction({
+      title: 'Deletar comentario',
+      message: 'Tem certeza que deseja deletar este comentario?',
+      confirmText: 'Deletar',
+      variant: 'danger',
+    });
+    if (confirmed) {
       deleteCommentMutation.mutate(commentId);
     }
   };
@@ -431,8 +514,14 @@ export default function CardModal({
     }
   };
 
-  const handleDeleteChecklist = (checklistId: string) => {
-    if (confirm('Tem certeza que deseja deletar esta checklist?')) {
+  const handleDeleteChecklist = async (checklistId: string) => {
+    const confirmed = await confirmAction({
+      title: 'Deletar checklist',
+      message: 'Tem certeza que deseja deletar esta checklist? Todos os itens serao removidos.',
+      confirmText: 'Deletar',
+      variant: 'danger',
+    });
+    if (confirmed) {
       deleteChecklistMutation.mutate(checklistId);
     }
   };
@@ -450,6 +539,53 @@ export default function CardModal({
 
   const handleDeleteChecklistItem = (itemId: string) => {
     deleteChecklistItemMutation.mutate(itemId);
+  };
+
+  const handleStartEditChecklist = (checklistId: string, currentTitle: string) => {
+    setEditingChecklistId(checklistId);
+    setEditingChecklistTitle(currentTitle);
+  };
+
+  const handleSaveChecklistTitle = () => {
+    if (editingChecklistId && editingChecklistTitle.trim()) {
+      updateChecklistMutation.mutate({
+        checklistId: editingChecklistId,
+        title: editingChecklistTitle.trim(),
+      });
+    } else {
+      setEditingChecklistId(null);
+      setEditingChecklistTitle('');
+    }
+  };
+
+  const handleStartEditItem = (itemId: string, currentTitle: string) => {
+    setEditingItemId(itemId);
+    setEditingItemTitle(currentTitle);
+  };
+
+  const handleSaveItemTitle = () => {
+    if (editingItemId && editingItemTitle.trim()) {
+      updateChecklistItemMutation.mutate({
+        itemId: editingItemId,
+        title: editingItemTitle.trim(),
+      });
+    } else {
+      setEditingItemId(null);
+      setEditingItemTitle('');
+    }
+  };
+
+  const handleToggleAllItems = (checklist: Checklist) => {
+    if (!checklist.items || checklist.items.length === 0) return;
+    const allCompleted = checklist.items.every((item) => item.isCompleted);
+    // If all completed, uncheck all. Otherwise, check all.
+    checklist.items.forEach((item) => {
+      if (allCompleted && item.isCompleted) {
+        toggleChecklistItemMutation.mutate({ itemId: item.id, isCompleted: false });
+      } else if (!allCompleted && !item.isCompleted) {
+        toggleChecklistItemMutation.mutate({ itemId: item.id, isCompleted: true });
+      }
+    });
   };
 
   const calculateChecklistProgress = (checklist: Checklist) => {
@@ -477,8 +613,14 @@ export default function CardModal({
     }
   };
 
-  const handleDeleteLabel = (labelId: string, labelName: string) => {
-    if (confirm(`Tem certeza que deseja deletar a label "${labelName}"? Ela será removida de todos os cards.`)) {
+  const handleDeleteLabel = async (labelId: string, labelName: string) => {
+    const confirmed = await confirmAction({
+      title: 'Deletar etiqueta',
+      message: `Tem certeza que deseja deletar a etiqueta "${labelName}"? Ela sera removida de todos os cards.`,
+      confirmText: 'Deletar',
+      variant: 'danger',
+    });
+    if (confirmed) {
       deleteLabelMutation.mutate(labelId);
     }
   };
@@ -667,6 +809,9 @@ export default function CardModal({
                     placeholder="Adicione uma descrição mais detalhada..."
                     autoFocus
                   />
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Suporta Markdown: **negrito**, *itálico*, `código`, listas, links e mais
+                  </div>
                   <div className="flex gap-2 mt-2">
                     <button
                       onClick={handleDescriptionSave}
@@ -691,9 +836,9 @@ export default function CardModal({
                   className="min-h-[80px] px-3 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 >
                   {description ? (
-                    <p className="text-gray-700 dark:text-gray-300">
-                      {renderTextWithLinks(description)}
-                    </p>
+                    <div className="prose prose-sm max-w-none markdown-description" style={{ color: 'var(--text-secondary)' }}>
+                      <ReactMarkdown>{description}</ReactMarkdown>
+                    </div>
                   ) : (
                     <p className="text-gray-400 dark:text-gray-500">
                       Adicione uma descrição mais detalhada...
@@ -752,9 +897,33 @@ export default function CardModal({
                     >
                       {/* Checklist Header */}
                       <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-                          {checklist.title}
-                        </h4>
+                        {editingChecklistId === checklist.id ? (
+                          <input
+                            type="text"
+                            value={editingChecklistTitle}
+                            onChange={(e) => setEditingChecklistTitle(e.target.value)}
+                            onBlur={handleSaveChecklistTitle}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleSaveChecklistTitle();
+                              } else if (e.key === 'Escape') {
+                                e.stopPropagation();
+                                setEditingChecklistId(null);
+                                setEditingChecklistTitle('');
+                              }
+                            }}
+                            className="text-sm font-semibold text-gray-900 dark:text-white bg-white dark:bg-gray-600 border border-blue-500 rounded px-2 py-0.5 flex-1 mr-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            autoFocus
+                          />
+                        ) : (
+                          <h4
+                            className="text-sm font-semibold text-gray-900 dark:text-white cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 rounded px-2 py-0.5 -ml-2 transition-colors"
+                            onClick={() => handleStartEditChecklist(checklist.id, checklist.title)}
+                            title="Clique para editar"
+                          >
+                            {checklist.title}
+                          </h4>
+                        )}
                         <button
                           onClick={() => handleDeleteChecklist(checklist.id)}
                           className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
@@ -780,10 +949,20 @@ export default function CardModal({
                             </span>
                             <div className="flex-1 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
                               <div
-                                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                className={`h-2 rounded-full transition-all duration-300 ${progress === 100 ? 'bg-green-500' : 'bg-blue-600'}`}
                                 style={{ width: `${progress}%` }}
                               />
                             </div>
+                            <span className="text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                              {checklist.items.filter((i) => i.isCompleted).length}/{checklist.items.length} concluídos
+                            </span>
+                            <button
+                              onClick={() => handleToggleAllItems(checklist)}
+                              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 whitespace-nowrap font-medium transition-colors"
+                              title={checklist.items.every((i) => i.isCompleted) ? 'Desmarcar todos' : 'Marcar todos'}
+                            >
+                              {checklist.items.every((i) => i.isCompleted) ? 'Desmarcar todos' : 'Marcar todos'}
+                            </button>
                           </div>
                         </div>
                       )}
@@ -793,7 +972,7 @@ export default function CardModal({
                         {checklist.items?.map((item) => (
                           <div
                             key={item.id}
-                            className="flex items-center gap-2 group py-1"
+                            className="flex items-center gap-2 group py-1 px-1 rounded hover:bg-gray-100 dark:hover:bg-gray-600/50 transition-colors"
                           >
                             <input
                               type="checkbox"
@@ -803,15 +982,37 @@ export default function CardModal({
                               }
                               className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
                             />
-                            <span
-                              className={`flex-1 text-sm ${
-                                item.isCompleted
-                                  ? 'line-through text-gray-500 dark:text-gray-400'
-                                  : 'text-gray-700 dark:text-gray-300'
-                              }`}
-                            >
-                              {item.title}
-                            </span>
+                            {editingItemId === item.id ? (
+                              <input
+                                type="text"
+                                value={editingItemTitle}
+                                onChange={(e) => setEditingItemTitle(e.target.value)}
+                                onBlur={handleSaveItemTitle}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleSaveItemTitle();
+                                  } else if (e.key === 'Escape') {
+                                    e.stopPropagation();
+                                    setEditingItemId(null);
+                                    setEditingItemTitle('');
+                                  }
+                                }}
+                                className="flex-1 text-sm bg-white dark:bg-gray-600 border border-blue-500 rounded px-2 py-0.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                autoFocus
+                              />
+                            ) : (
+                              <span
+                                className={`flex-1 text-sm cursor-pointer ${
+                                  item.isCompleted
+                                    ? 'line-through text-gray-500 dark:text-gray-400'
+                                    : 'text-gray-700 dark:text-gray-300'
+                                }`}
+                                onDoubleClick={() => handleStartEditItem(item.id, item.title)}
+                                title="Clique duas vezes para editar"
+                              >
+                                {item.title}
+                              </span>
+                            )}
                             <button
                               onClick={() => handleDeleteChecklistItem(item.id)}
                               className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-opacity"
@@ -1358,181 +1559,274 @@ export default function CardModal({
               </div>
             </div>
 
-            {/* Activities Section */}
-            <div className="space-y-4">
-              <h3 className="flex items-center gap-2 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                Atividades
-              </h3>
-
-              <div className="space-y-3">
-                {activities.length === 0 ? (
-                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                    Nenhuma atividade registrada
-                  </p>
-                ) : (
-                  activities.map((activity) => {
-                    const getActivityIcon = () => {
-                      switch (activity.actionType) {
-                        case 'CREATED':
-                          return (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                            </svg>
-                          );
-                        case 'UPDATED':
-                          return (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          );
-                        case 'MOVED':
-                          return (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                            </svg>
-                          );
-                        case 'ARCHIVED':
-                          return (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                            </svg>
-                          );
-                        case 'COMMENTED':
-                          return (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                            </svg>
-                          );
-                        case 'ASSIGNED':
-                          return (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
-                          );
-                        case 'LABELED':
-                          return (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                            </svg>
-                          );
-                        case 'ATTACHED':
-                          return (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                            </svg>
-                          );
-                        case 'COVER_CHANGED':
-                          return (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                          );
-                        case 'DUE_DATE_CHANGED':
-                          return (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                          );
-                        case 'COMPLETION_TIME_SET':
-                          return (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          );
-                        default:
-                          return (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          );
-                      }
-                    };
-
-                    const getActivityText = () => {
-                      let details;
-                      try {
-                        details = activity.details ? JSON.parse(activity.details) : {};
-                      } catch {
-                        details = {};
-                      }
-
-                      switch (activity.actionType) {
-                        case 'CREATED':
-                          return 'criou este card';
-                        case 'UPDATED':
-                          return 'atualizou este card';
-                        case 'MOVED':
-                          return `moveu de "${details.fromList}" para "${details.toList}"`;
-                        case 'ARCHIVED':
-                          return 'arquivou este card';
-                        case 'COMMENTED':
-                          return 'adicionou um comentário';
-                        case 'ASSIGNED':
-                          return `atribuiu ${details.assignedUserName}`;
-                        case 'LABELED':
-                          return details.action === 'added' ? `adicionou a etiqueta "${details.labelName}"` : `removeu a etiqueta "${details.labelName}"`;
-                        case 'ATTACHED':
-                          return `anexou "${details.fileName}"`;
-                        case 'COVER_CHANGED':
-                          return details.action === 'set' ? 'definiu uma capa' : 'removeu a capa';
-                        case 'DUE_DATE_CHANGED':
-                          return details.action === 'set' ? 'definiu a data de vencimento' : 'removeu a data de vencimento';
-                        case 'COMPLETION_TIME_SET':
-                          return details.completionTime ? 'definiu o tempo de conclusão' : 'removeu o tempo de conclusão';
-                        default:
-                          return 'realizou uma ação';
-                      }
-                    };
-
-                    const timeAgo = (date: string) => {
-                      const now = new Date();
-                      const activityDate = new Date(date);
-                      const diffMs = now.getTime() - activityDate.getTime();
-                      const diffMins = Math.floor(diffMs / 60000);
-                      const diffHours = Math.floor(diffMs / 3600000);
-                      const diffDays = Math.floor(diffMs / 86400000);
-
-                      if (diffMins < 1) return 'agora mesmo';
-                      if (diffMins < 60) return `há ${diffMins} min`;
-                      if (diffHours < 24) return `há ${diffHours}h`;
-                      if (diffDays < 7) return `há ${diffDays}d`;
-                      return activityDate.toLocaleDateString('pt-BR');
-                    };
-
-                    return (
-                      <div
-                        key={activity.id}
-                        className="flex gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                        style={{
-                          borderLeft: '2px solid var(--border-color)',
-                        }}
-                      >
-                        <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-                          {getActivityIcon()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                            <span className="font-semibold">{activity.user.name}</span>
-                            {' '}
-                            <span className="text-gray-600 dark:text-gray-400">{getActivityText()}</span>
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            {timeAgo(activity.createdAt)}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
+            {/* Activity History Timeline */}
+            <div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: showActivities ? '16px' : '0',
+                }}
+              >
+                <h3
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: 'var(--text-primary)',
+                    margin: 0,
+                  }}
+                >
+                  <svg
+                    style={{ width: '16px', height: '16px', color: 'var(--accent)' }}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  Historico de Atividade
+                  {activities.length > 0 && (
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: 'var(--text-faint)',
+                        backgroundColor: 'var(--border-accent)',
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                      }}
+                    >
+                      {activities.length}
+                    </span>
+                  )}
+                </h3>
+                <button
+                  onClick={() => setShowActivities(!showActivities)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 10px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: 'var(--accent)',
+                    backgroundColor: 'var(--accent-bg)',
+                    border: '1px solid var(--border-accent-medium)',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--border-accent-medium)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--accent-bg)';
+                  }}
+                >
+                  <svg
+                    style={{
+                      width: '14px',
+                      height: '14px',
+                      transform: showActivities ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.2s',
+                    }}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                  {showActivities ? 'Ocultar' : 'Mostrar'}
+                </button>
               </div>
+
+              {showActivities && (
+                <div>
+                  {activities.length === 0 ? (
+                    <p
+                      style={{
+                        fontSize: '13px',
+                        color: 'var(--text-dimmed)',
+                        textAlign: 'center',
+                        padding: '20px 0',
+                      }}
+                    >
+                      Nenhuma atividade registrada.
+                    </p>
+                  ) : (
+                    <div style={{ position: 'relative', paddingLeft: '20px' }}>
+                      {/* Vertical timeline line */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: '13px',
+                          top: '14px',
+                          bottom: '14px',
+                          width: '2px',
+                          backgroundColor: 'var(--border-accent)',
+                          borderRadius: '1px',
+                        }}
+                      />
+
+                      {activities.map((activity, index) => {
+                        let details: any = {};
+                        try {
+                          details = activity.details ? JSON.parse(activity.details) : {};
+                        } catch {
+                          details = {};
+                        }
+
+                        const getDescription = () => {
+                          switch (activity.actionType) {
+                            case 'CREATED':
+                              return 'criou este card';
+                            case 'UPDATED':
+                              return 'atualizou este card';
+                            case 'MOVED':
+                              return `moveu de \u201c${details.fromList || '?'}\u201d para \u201c${details.toList || '?'}\u201d`;
+                            case 'ARCHIVED':
+                              return 'arquivou este card';
+                            case 'DELETED':
+                              return 'excluiu este card';
+                            case 'COMMENTED':
+                              return details.comment
+                                ? `comentou: ${details.comment}`
+                                : 'adicionou um comentario';
+                            case 'ASSIGNED':
+                              return `atribuiu ${details.assignedUserName || 'um membro'}`;
+                            case 'LABELED':
+                              return details.action === 'added'
+                                ? `adicionou etiqueta \u201c${details.labelName || ''}\u201d`
+                                : `removeu etiqueta \u201c${details.labelName || ''}\u201d`;
+                            case 'ATTACHED':
+                              return `anexou \u201c${details.fileName || 'arquivo'}\u201d`;
+                            case 'COVER_CHANGED':
+                              return details.action === 'set' ? 'alterou a capa' : 'removeu a capa';
+                            case 'DUE_DATE_CHANGED':
+                              return details.action === 'set' ? 'definiu prazo' : 'removeu prazo';
+                            case 'COMPLETION_TIME_SET':
+                              return 'definiu tempo de conclusao';
+                            default:
+                              return String(activity.actionType);
+                          }
+                        };
+
+                        const formatRelativeTime = (dateStr: string) => {
+                          const now = new Date();
+                          const date = new Date(dateStr);
+                          const diffMs = now.getTime() - date.getTime();
+                          const diffMins = Math.floor(diffMs / 60000);
+                          const diffHours = Math.floor(diffMs / 3600000);
+                          const diffDays = Math.floor(diffMs / 86400000);
+
+                          if (diffMins < 1) return 'agora';
+                          if (diffMins < 60) return `${diffMins} min atras`;
+                          if (diffHours < 24) return `${diffHours} h atras`;
+                          if (diffDays < 7) return `${diffDays} dias atras`;
+
+                          const months = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+                          return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+                        };
+
+                        const userInitial = activity.user?.name
+                          ? activity.user.name.charAt(0).toUpperCase()
+                          : '?';
+
+                        return (
+                          <div
+                            key={activity.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '10px',
+                              paddingBottom: index < activities.length - 1 ? '16px' : '0',
+                              position: 'relative',
+                            }}
+                          >
+                            {/* Timeline dot */}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                left: '-20px',
+                                top: '4px',
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                backgroundColor: index === 0 ? 'var(--accent)' : 'var(--accent-bg-strong)',
+                                border: '2px solid var(--border-accent-medium)',
+                                zIndex: 1,
+                              }}
+                            />
+
+                            {/* User avatar */}
+                            {(activity.user as any)?.avatarUrl ? (
+                              <img
+                                src={(activity.user as any).avatarUrl}
+                                alt={activity.user.name}
+                                style={{
+                                  width: '28px',
+                                  height: '28px',
+                                  borderRadius: '50%',
+                                  objectFit: 'cover',
+                                  flexShrink: 0,
+                                }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: '28px',
+                                  height: '28px',
+                                  borderRadius: '50%',
+                                  background: 'var(--gradient-primary)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#fff',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {userInitial}
+                              </div>
+                            )}
+
+                            {/* Activity content */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.4' }}>
+                                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                                  {activity.user.name}
+                                </span>{' '}
+                                <span style={{ color: 'var(--text-faint)' }}>
+                                  {getDescription()}
+                                </span>
+                              </p>
+                              <p
+                                style={{
+                                  margin: '2px 0 0 0',
+                                  fontSize: '11px',
+                                  color: 'var(--text-dimmed)',
+                                }}
+                              >
+                                {formatRelativeTime(activity.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1765,17 +2059,33 @@ export default function CardModal({
               </div>
             )}
 
+            {/* Start Date Picker */}
+            <div>
+              <DatePicker
+                value={startDate}
+                onChange={(date) => {
+                  setStartDate(date ? new Date(date).toISOString().split('T')[0] : '');
+                  updateCardMutation.mutate({ startDate: date || null } as any);
+                }}
+                onClear={() => {
+                  setStartDate('');
+                  updateCardMutation.mutate({ startDate: null } as any);
+                }}
+                placeholder="Data de Início"
+              />
+            </div>
+
             {/* Due Date Picker */}
             <div>
               <DatePicker
                 value={dueDate}
                 onChange={(date) => {
                   setDueDate(date ? new Date(date).toISOString().split('T')[0] : '');
-                  updateCardMutation.mutate({ dueDate: date || undefined });
+                  updateCardMutation.mutate({ dueDate: date || null } as any);
                 }}
                 onClear={() => {
                   setDueDate('');
-                  updateCardMutation.mutate({ dueDate: undefined });
+                  updateCardMutation.mutate({ dueDate: null } as any);
                 }}
                 placeholder="Data de Vencimento"
               />
@@ -1784,6 +2094,164 @@ export default function CardModal({
             <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider pt-4">
               Ações
             </h3>
+
+            {/* Move Card */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setShowMoveMenu(!showMoveMenu);
+                  setShowCopyMenu(false);
+                  setSelectedMoveListId('');
+                }}
+                className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm font-medium flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 7l5 5m0 0l-5 5m5-5H6"
+                  />
+                </svg>
+                Mover
+              </button>
+              {showMoveMenu && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    background: 'var(--surface-dropdown, #1f2937)',
+                    border: '1px solid var(--border-accent, #374151)',
+                    borderRadius: 10,
+                    padding: 12,
+                    boxShadow: 'var(--shadow-lg, 0 10px 15px -3px rgba(0,0,0,0.3))',
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    marginTop: 4,
+                    zIndex: 20,
+                  }}
+                >
+                  <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary, #fff)' }}>
+                    Mover card
+                  </h4>
+                  <select
+                    value={selectedMoveListId}
+                    onChange={(e) => setSelectedMoveListId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-2"
+                  >
+                    <option value="">Selecione uma lista...</option>
+                    {boardLists.map((list: any) => (
+                      <option
+                        key={list.id}
+                        value={list.id}
+                        disabled={list.id === card.listId}
+                      >
+                        {list.title}{list.id === card.listId ? ' (atual)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        if (selectedMoveListId) {
+                          moveCardMutation.mutate(selectedMoveListId);
+                        }
+                      }}
+                      disabled={!selectedMoveListId || moveCardMutation.isPending}
+                      className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {moveCardMutation.isPending ? 'Movendo...' : 'Mover'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowMoveMenu(false);
+                        setSelectedMoveListId('');
+                      }}
+                      className="px-3 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors text-sm"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Copy Card */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setShowCopyMenu(!showCopyMenu);
+                  setShowMoveMenu(false);
+                  setSelectedCopyListId('');
+                }}
+                className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm font-medium flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
+                  />
+                </svg>
+                Copiar
+              </button>
+              {showCopyMenu && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    background: 'var(--surface-dropdown, #1f2937)',
+                    border: '1px solid var(--border-accent, #374151)',
+                    borderRadius: 10,
+                    padding: 12,
+                    boxShadow: 'var(--shadow-lg, 0 10px 15px -3px rgba(0,0,0,0.3))',
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    marginTop: 4,
+                    zIndex: 20,
+                  }}
+                >
+                  <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary, #fff)' }}>
+                    Copiar card
+                  </h4>
+                  <select
+                    value={selectedCopyListId}
+                    onChange={(e) => setSelectedCopyListId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-2"
+                  >
+                    <option value="">Selecione uma lista...</option>
+                    {boardLists.map((list: any) => (
+                      <option key={list.id} value={list.id}>
+                        {list.title}{list.id === card.listId ? ' (atual)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        if (selectedCopyListId) {
+                          copyCardMutation.mutate(selectedCopyListId);
+                        }
+                      }}
+                      disabled={!selectedCopyListId || copyCardMutation.isPending}
+                      className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {copyCardMutation.isPending ? 'Copiando...' : 'Copiar'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowCopyMenu(false);
+                        setSelectedCopyListId('');
+                      }}
+                      className="px-3 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors text-sm"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Duplicate */}
             <button
@@ -1919,8 +2387,14 @@ export default function CardModal({
 
             {/* Delete */}
             <button
-              onClick={() => {
-                if (confirm('Tem certeza que deseja deletar este card?')) {
+              onClick={async () => {
+                const confirmed = await confirmAction({
+                  title: 'Deletar card',
+                  message: 'Tem certeza que deseja deletar este card? Esta acao nao pode ser desfeita.',
+                  confirmText: 'Deletar',
+                  variant: 'danger',
+                });
+                if (confirmed) {
                   deleteCardMutation.mutate();
                 }
               }}
@@ -1940,6 +2414,7 @@ export default function CardModal({
           </div>
         </div>
       </div>
+      <ConfirmDialog />
     </div>
   );
 }

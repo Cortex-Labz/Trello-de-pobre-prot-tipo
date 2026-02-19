@@ -96,7 +96,7 @@ export default function LoginPage() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#080a13',
+      background: 'var(--surface-base)',
       overflow: 'hidden',
       position: 'relative',
     }}>
@@ -107,21 +107,18 @@ export default function LoginPage() {
           position: 'absolute',
           inset: 0,
           background: `
-            radial-gradient(ellipse 70% 50% at 50% 0%, rgba(102, 126, 234, 0.12) 0%, transparent 60%),
-            radial-gradient(ellipse 50% 40% at 20% 80%, rgba(118, 75, 162, 0.08) 0%, transparent 50%),
-            radial-gradient(ellipse 50% 40% at 80% 80%, rgba(102, 126, 234, 0.06) 0%, transparent 50%),
-            #080a13
+            radial-gradient(ellipse 70% 50% at 50% 0%, var(--auth-glow-primary) 0%, transparent 60%),
+            radial-gradient(ellipse 50% 40% at 20% 80%, var(--auth-glow-secondary) 0%, transparent 50%),
+            radial-gradient(ellipse 50% 40% at 80% 80%, var(--auth-glow-tertiary) 0%, transparent 50%),
+            var(--auth-bg-base)
           `,
         }} />
-        {/* Grid */}
+        {/* Dot grid */}
         <div style={{
           position: 'absolute',
           inset: 0,
-          backgroundImage: `
-            linear-gradient(rgba(102, 126, 234, 0.025) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(102, 126, 234, 0.025) 1px, transparent 1px)
-          `,
-          backgroundSize: '48px 48px',
+          backgroundImage: 'radial-gradient(circle, var(--auth-grid-line) 1.2px, transparent 1.2px)',
+          backgroundSize: '32px 32px',
           maskImage: 'radial-gradient(ellipse 60% 50% at 50% 40%, black 20%, transparent 70%)',
           WebkitMaskImage: 'radial-gradient(ellipse 60% 50% at 50% 40%, black 20%, transparent 70%)',
         }} />
@@ -134,7 +131,7 @@ export default function LoginPage() {
           left: '50%',
           transform: 'translate(-50%, -50%)',
           borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(102, 126, 234, 0.07) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, var(--auth-glow-center) 0%, transparent 70%)',
           filter: 'blur(40px)',
           animation: 'lp-pulse 8s ease-in-out infinite',
         }} />
@@ -146,7 +143,7 @@ export default function LoginPage() {
               width: p.size,
               height: p.size,
               borderRadius: '50%',
-              background: 'rgba(102, 126, 234, 0.3)',
+              background: 'var(--auth-particle)',
               left: p.left,
               animation: `lp-drift ${p.duration} linear infinite`,
               animationDelay: p.delay,
@@ -177,8 +174,8 @@ export default function LoginPage() {
             width: 56,
             height: 56,
             borderRadius: 18,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            boxShadow: '0 8px 32px rgba(102, 126, 234, 0.3), 0 0 60px rgba(102, 126, 234, 0.1)',
+            background: 'var(--gradient-primary)',
+            boxShadow: '0 8px 32px var(--accent-bg-strong), 0 0 60px var(--accent-bg-subtle)',
             marginBottom: 16,
           }}>
             <svg width="28" height="28" fill="none" stroke="white" viewBox="0 0 24 24">
@@ -188,7 +185,7 @@ export default function LoginPage() {
           <div style={{
             fontSize: 26,
             fontWeight: 800,
-            background: 'linear-gradient(135deg, #e4e6eb 0%, #a3b1e8 100%)',
+            background: 'linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
@@ -197,19 +194,19 @@ export default function LoginPage() {
           }}>
             VersatlyTask
           </div>
-          <div style={{ fontSize: 14, color: '#5a5f7a', fontWeight: 400 }}>
+          <div style={{ fontSize: 14, color: 'var(--text-dimmed)', fontWeight: 400 }}>
             Gerencie projetos com simplicidade
           </div>
         </div>
 
         {/* Card */}
         <div style={{
-          background: 'rgba(14, 16, 28, 0.7)',
-          border: '1px solid rgba(102, 126, 234, 0.1)',
+          background: 'var(--surface-card-solid)',
+          border: '1px solid var(--border-accent)',
           borderRadius: 24,
           padding: '40px 36px',
           backdropFilter: 'blur(40px)',
-          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03) inset, 0 1px 0 rgba(255, 255, 255, 0.04) inset',
+          boxShadow: 'var(--modal-shadow)',
           animation: 'lp-cardAppear 0.8s ease-out both',
           animationDelay: '0.15s',
         }}>
@@ -219,10 +216,10 @@ export default function LoginPage() {
             animation: 'lp-fieldIn 0.5s ease-out both',
             animationDelay: '0.3s',
           }}>
-            <h2 style={{ fontSize: 22, fontWeight: 700, color: '#e4e6eb', marginBottom: 6 }}>
+            <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
               Bem-vindo de volta
             </h2>
-            <p style={{ fontSize: 14, color: '#5a5f7a' }}>
+            <p style={{ fontSize: 14, color: 'var(--text-dimmed)' }}>
               Entre na sua conta para continuar
             </p>
           </div>
@@ -254,7 +251,7 @@ export default function LoginPage() {
               animation: 'lp-fieldIn 0.5s ease-out both',
               animationDelay: '0.5s',
             }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#8b8fa3', marginBottom: 7 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--text-faint)', marginBottom: 7 }}>
                 Email
               </label>
               <div style={{ position: 'relative' }}>
@@ -271,14 +268,14 @@ export default function LoginPage() {
                     width: '100%',
                     padding: '13px 16px 13px 44px',
                     borderRadius: 14,
-                    border: `1.5px solid ${emailFocused ? 'rgba(102, 126, 234, 0.45)' : 'rgba(102, 126, 234, 0.08)'}`,
-                    background: emailFocused ? 'rgba(15, 17, 28, 1)' : 'rgba(15, 17, 28, 0.8)',
-                    color: '#e4e6eb',
+                    border: `1.5px solid ${emailFocused ? 'var(--accent-bg-strong)' : 'var(--accent-bg)'}`,
+                    background: emailFocused ? 'var(--surface-input)' : 'var(--surface-input)',
+                    color: 'var(--text-primary)',
                     fontSize: 14,
                     fontFamily: "'Inter', sans-serif",
                     outline: 'none',
                     transition: 'all 0.25s ease',
-                    boxShadow: emailFocused ? '0 0 0 3px rgba(102, 126, 234, 0.06)' : 'none',
+                    boxShadow: emailFocused ? '0 0 0 3px var(--accent-bg-subtle)' : 'none',
                     boxSizing: 'border-box',
                   }}
                 />
@@ -287,7 +284,7 @@ export default function LoginPage() {
                   left: 14,
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  color: emailFocused ? '#667eea' : '#333758',
+                  color: emailFocused ? 'var(--accent)' : 'var(--text-dimmed)',
                   transition: 'color 0.25s',
                   pointerEvents: 'none',
                 }}>
@@ -304,7 +301,7 @@ export default function LoginPage() {
               animation: 'lp-fieldIn 0.5s ease-out both',
               animationDelay: '0.55s',
             }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#8b8fa3', marginBottom: 7 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--text-faint)', marginBottom: 7 }}>
                 Senha
               </label>
               <div style={{ position: 'relative' }}>
@@ -321,14 +318,14 @@ export default function LoginPage() {
                     width: '100%',
                     padding: '13px 44px 13px 44px',
                     borderRadius: 14,
-                    border: `1.5px solid ${passwordFocused ? 'rgba(102, 126, 234, 0.45)' : 'rgba(102, 126, 234, 0.08)'}`,
-                    background: passwordFocused ? 'rgba(15, 17, 28, 1)' : 'rgba(15, 17, 28, 0.8)',
-                    color: '#e4e6eb',
+                    border: `1.5px solid ${passwordFocused ? 'var(--accent-bg-strong)' : 'var(--accent-bg)'}`,
+                    background: passwordFocused ? 'var(--surface-input)' : 'var(--surface-input)',
+                    color: 'var(--text-primary)',
                     fontSize: 14,
                     fontFamily: "'Inter', sans-serif",
                     outline: 'none',
                     transition: 'all 0.25s ease',
-                    boxShadow: passwordFocused ? '0 0 0 3px rgba(102, 126, 234, 0.06)' : 'none',
+                    boxShadow: passwordFocused ? '0 0 0 3px var(--accent-bg-subtle)' : 'none',
                     boxSizing: 'border-box',
                   }}
                 />
@@ -337,7 +334,7 @@ export default function LoginPage() {
                   left: 14,
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  color: passwordFocused ? '#667eea' : '#333758',
+                  color: passwordFocused ? 'var(--accent)' : 'var(--text-dimmed)',
                   transition: 'color 0.25s',
                   pointerEvents: 'none',
                 }}>
@@ -355,15 +352,15 @@ export default function LoginPage() {
                     transform: 'translateY(-50%)',
                     background: 'none',
                     border: 'none',
-                    color: '#333758',
+                    color: 'var(--text-dimmed)',
                     cursor: 'pointer',
                     padding: 2,
                     transition: 'color 0.25s',
                     display: 'flex',
                     alignItems: 'center',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = '#667eea')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = '#333758')}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-dimmed)')}
                 >
                   {showPassword ? (
                     <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -396,15 +393,15 @@ export default function LoginPage() {
                   gap: 8,
                   cursor: 'pointer',
                   fontSize: 13,
-                  color: '#6b7094',
+                  color: 'var(--text-disabled)',
                 }}
               >
                 <div style={{
                   width: 16,
                   height: 16,
                   borderRadius: 5,
-                  border: rememberMe ? 'none' : '1.5px solid rgba(102, 126, 234, 0.15)',
-                  background: rememberMe ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'rgba(15, 17, 28, 0.8)',
+                  border: rememberMe ? 'none' : '1.5px solid var(--accent-bg)',
+                  background: rememberMe ? 'var(--gradient-primary)' : 'var(--surface-base)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -422,13 +419,13 @@ export default function LoginPage() {
                 onClick={(e) => e.preventDefault()}
                 style={{
                   fontSize: 13,
-                  color: '#667eea',
+                  color: 'var(--accent)',
                   textDecoration: 'none',
                   fontWeight: 500,
                   transition: 'color 0.2s',
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#a78bfa')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = '#667eea')}
+                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-2)')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--accent)')}
               >
                 Esqueceu a senha?
               </a>
@@ -443,7 +440,7 @@ export default function LoginPage() {
                 padding: 14,
                 borderRadius: 14,
                 border: 'none',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'var(--gradient-primary)',
                 color: 'white',
                 fontSize: 15,
                 fontWeight: 600,
@@ -452,7 +449,7 @@ export default function LoginPage() {
                 position: 'relative',
                 overflow: 'hidden',
                 transition: 'all 0.3s ease',
-                boxShadow: '0 4px 20px rgba(102, 126, 234, 0.25)',
+                boxShadow: '0 4px 20px var(--accent-bg-medium)',
                 opacity: loading ? 0.7 : 1,
                 animation: 'lp-fieldIn 0.5s ease-out both',
                 animationDelay: '0.65s',
@@ -460,12 +457,12 @@ export default function LoginPage() {
               onMouseEnter={(e) => {
                 if (!loading) {
                   e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 8px 32px rgba(102, 126, 234, 0.35)';
+                  e.currentTarget.style.boxShadow = '0 8px 32px var(--accent-bg-strong)';
                 }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 20px rgba(102, 126, 234, 0.25)';
+                e.currentTarget.style.boxShadow = '0 4px 20px var(--accent-bg-medium)';
               }}
             >
               <span style={{
@@ -500,22 +497,22 @@ export default function LoginPage() {
             textAlign: 'center',
             marginTop: 24,
             paddingTop: 20,
-            borderTop: '1px solid rgba(102, 126, 234, 0.06)',
+            borderTop: '1px solid var(--border-subtle)',
             animation: 'lp-fieldIn 0.5s ease-out both',
             animationDelay: '0.7s',
           }}>
-            <p style={{ fontSize: 13, color: '#4a4f6a' }}>
+            <p style={{ fontSize: 13, color: 'var(--text-dimmed)' }}>
               Ainda nao tem conta?{' '}
               <Link
                 to="/register"
                 style={{
-                  color: '#667eea',
+                  color: 'var(--accent)',
                   textDecoration: 'none',
                   fontWeight: 600,
                   transition: 'color 0.2s',
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#a78bfa')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = '#667eea')}
+                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-2)')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--accent)')}
               >
                 Criar conta gratis
               </Link>
@@ -533,8 +530,8 @@ export default function LoginPage() {
           animationDelay: '0.6s',
         }}>
           {['Tempo real', 'Colaborativo', 'Drag & Drop', 'Seguro'].map((feat) => (
-            <div key={feat} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#3d4162', fontWeight: 500 }}>
-              <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#667eea', opacity: 0.5 }} />
+            <div key={feat} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-dimmed)', fontWeight: 500 }}>
+              <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', opacity: 0.5 }} />
               {feat}
             </div>
           ))}

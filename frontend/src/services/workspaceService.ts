@@ -62,7 +62,27 @@ export const workspaceService = {
     await api.delete(`/workspaces/${workspaceId}/members/${userId}`);
   },
 
+  async getWorkspaceMembers(workspaceId: string, query?: string): Promise<{ members: any[] }> {
+    const params = query ? `?q=${encodeURIComponent(query)}` : '';
+    const response = await api.get(`/workspaces/${workspaceId}/members${params}`);
+    return response.data;
+  },
+
   async reorderWorkspaces(workspaces: { id: string; position: number }[]): Promise<void> {
     await api.put('/workspaces/reorder', { workspaces });
+  },
+
+  async getWorkspaceActivities(
+    workspaceId: string,
+    params?: { limit?: number; offset?: number; type?: string; boardId?: string }
+  ): Promise<{ activities: any[]; total: number }> {
+    const searchParams = new URLSearchParams();
+    if (params?.limit) searchParams.set('limit', String(params.limit));
+    if (params?.offset) searchParams.set('offset', String(params.offset));
+    if (params?.type) searchParams.set('type', params.type);
+    if (params?.boardId) searchParams.set('boardId', params.boardId);
+    const qs = searchParams.toString();
+    const response = await api.get(`/workspaces/${workspaceId}/activities${qs ? `?${qs}` : ''}`);
+    return response.data;
   },
 };

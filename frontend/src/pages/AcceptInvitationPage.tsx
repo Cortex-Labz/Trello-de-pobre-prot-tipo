@@ -60,7 +60,7 @@ export default function AcceptInvitationPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--surface-base)' }}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
           <p style={{ color: 'var(--text-secondary)' }}>Carregando convite...</p>
@@ -71,7 +71,7 @@ export default function AcceptInvitationPage() {
 
   if (error || !invitation) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--surface-base)' }}>
         <div className="max-w-md w-full mx-4 p-8 rounded-2xl" style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-color)' }}>
           <div className="text-center">
             <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
@@ -88,7 +88,7 @@ export default function AcceptInvitationPage() {
             <button
               onClick={() => navigate('/dashboard')}
               className="px-6 py-2 rounded-lg font-medium"
-              style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}
+              style={{ background: 'var(--gradient-primary)', color: 'white' }}
             >
               Voltar ao Dashboard
             </button>
@@ -110,7 +110,7 @@ export default function AcceptInvitationPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--surface-base)' }}>
       <div className="max-w-md w-full mx-4 p-8 rounded-2xl" style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-color)' }}>
         {/* Header */}
         <div className="text-center mb-6">
@@ -176,7 +176,7 @@ export default function AcceptInvitationPage() {
               className="inline-block px-3 py-1 rounded-lg text-sm font-medium"
               style={{
                 background: invitation.role === 'ADMIN'
-                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                  ? 'var(--gradient-primary)'
                   : 'var(--surface-hover)',
                 color: invitation.role === 'ADMIN' ? 'white' : 'var(--text-primary)',
               }}
@@ -208,7 +208,7 @@ export default function AcceptInvitationPage() {
             onClick={() => acceptMutation.mutate()}
             disabled={acceptMutation.isPending || declineMutation.isPending}
             className="flex-1 px-6 py-3 rounded-lg font-medium transition-all disabled:opacity-50"
-            style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}
+            style={{ background: 'var(--gradient-primary)', color: 'white' }}
           >
             {acceptMutation.isPending ? 'Aceitando...' : 'Aceitar Convite'}
           </button>

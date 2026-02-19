@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { validationResult } from 'express-validator';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { activityService } from '../services/activityService';
 
 // GET /api/cards/:cardId/checklists
 export async function getChecklists(req: AuthRequest, res: Response): Promise<void> {
@@ -106,6 +107,19 @@ export async function createChecklist(req: AuthRequest, res: Response): Promise<
       },
     });
 
+    // Log activity (fire-and-forget)
+    const cardWithBoard = await prisma.card.findUnique({
+      where: { id: cardId },
+      select: { list: { select: { boardId: true } }, title: true },
+    });
+    if (cardWithBoard) {
+      activityService.logCardUpdated(cardWithBoard.list.boardId, cardId, req.userId!, {
+        action: 'checklist_created',
+        checklistTitle: title,
+        cardTitle: cardWithBoard.title,
+      }).catch(console.error);
+    }
+
     res.status(201).json({ checklist });
   } catch (error) {
     console.error('Error creating checklist:', error);
@@ -172,7 +186,7 @@ export async function deleteChecklist(req: AuthRequest, res: Response): Promise<
   try {
     const { id } = req.params;
 
-    // Verify user has access to the checklist
+    // Verify user has access to the checklist (include card/board info for activity log)
     const existingChecklist = await prisma.checklist.findFirst({
       where: {
         id,
@@ -188,12 +202,28 @@ export async function deleteChecklist(req: AuthRequest, res: Response): Promise<
           },
         },
       },
+      include: {
+        card: {
+          select: {
+            id: true,
+            list: { select: { boardId: true } },
+          },
+        },
+      },
     });
 
     if (!existingChecklist) {
       res.status(404).json({ error: 'Checklist not found or access denied' });
       return;
     }
+
+    // Log activity before deletion (fire-and-forget)
+    const boardId = existingChecklist.card.list.boardId;
+    const cardId = existingChecklist.card.id;
+    activityService.logCardUpdated(boardId, cardId, req.userId!, {
+      action: 'checklist_deleted',
+      checklistTitle: existingChecklist.title,
+    }).catch(console.error);
 
     // Delete all items first (cascade should handle this, but being explicit)
     await prisma.checklistItem.deleteMany({
@@ -280,7 +310,7 @@ export async function updateChecklistItem(req: AuthRequest, res: Response): Prom
     const { id } = req.params;
     const { title, isCompleted } = req.body;
 
-    // Verify user has access to the item
+    // Verify user has access to the item (include card/board info for activity log)
     const existingItem = await prisma.checklistItem.findFirst({
       where: {
         id,
@@ -293,6 +323,18 @@ export async function updateChecklistItem(req: AuthRequest, res: Response): Prom
                     userId: req.userId,
                   },
                 },
+              },
+            },
+          },
+        },
+      },
+      include: {
+        checklist: {
+          select: {
+            card: {
+              select: {
+                id: true,
+                list: { select: { boardId: true } },
               },
             },
           },
@@ -312,6 +354,16 @@ export async function updateChecklistItem(req: AuthRequest, res: Response): Prom
         ...(isCompleted !== undefined && { isCompleted }),
       },
     });
+
+    // Log activity when isCompleted changes (fire-and-forget)
+    if (isCompleted !== undefined && isCompleted !== existingItem.isCompleted) {
+      const boardId = existingItem.checklist.card.list.boardId;
+      const cardId = existingItem.checklist.card.id;
+      activityService.logCardUpdated(boardId, cardId, req.userId!, {
+        action: isCompleted ? 'checklist_item_completed' : 'checklist_item_uncompleted',
+        itemTitle: existingItem.title,
+      }).catch(console.error);
+    }
 
     res.json({ item });
   } catch (error) {

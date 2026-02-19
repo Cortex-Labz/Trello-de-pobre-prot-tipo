@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { body } from 'express-validator';
 import {
   getCard,
+  getMyCards,
   createCard,
   updateCard,
   deleteCard,
@@ -18,6 +19,9 @@ const router = Router();
 
 // All routes require authentication
 router.use(authenticate);
+
+// GET /api/cards/my-cards (must be before /:id to avoid conflict)
+router.get('/my-cards', getMyCards);
 
 // GET /api/cards/:id
 router.get('/:id', getCard);

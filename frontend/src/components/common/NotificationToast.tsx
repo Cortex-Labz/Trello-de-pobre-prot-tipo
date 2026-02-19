@@ -37,6 +37,10 @@ export function NotificationToast({ notification, onClose, duration = 5000 }: To
         return '⏰';
       case 'CARD_MOVED':
         return '🔄';
+      case 'CARD_CREATED':
+        return '➕';
+      case 'CARD_DELETED':
+        return '🗑️';
       default:
         return '🔔';
     }

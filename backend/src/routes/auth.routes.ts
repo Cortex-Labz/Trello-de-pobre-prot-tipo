@@ -5,6 +5,8 @@ import {
   login,
   getMe,
   updateProfile,
+  changePassword,
+  uploadAvatar,
 } from '../controllers/auth.controller';
 import { authenticate } from '../middleware/auth.middleware';
 
@@ -33,6 +35,27 @@ router.post(
 
 // GET /api/auth/me (protected)
 router.get('/me', authenticate, getMe);
+
+// PUT /api/auth/me/password (protected)
+router.put(
+  '/me/password',
+  authenticate,
+  [
+    body('currentPassword').notEmpty().withMessage('Senha atual é obrigatória'),
+    body('newPassword').isLength({ min: 6 }).withMessage('Nova senha deve ter pelo menos 6 caracteres'),
+  ],
+  changePassword
+);
+
+// POST /api/auth/me/avatar (protected)
+router.post(
+  '/me/avatar',
+  authenticate,
+  [
+    body('imageData').notEmpty().withMessage('Dados da imagem são obrigatórios'),
+  ],
+  uploadAvatar
+);
 
 // PUT /api/auth/me (protected)
 router.put(

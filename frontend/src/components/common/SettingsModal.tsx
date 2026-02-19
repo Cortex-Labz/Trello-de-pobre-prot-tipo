@@ -62,7 +62,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        backgroundColor: 'var(--overlay-bg)',
         backdropFilter: 'blur(8px)',
       }}
       onClick={onClose}
@@ -72,7 +72,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         style={{
           background: 'var(--surface-primary)',
           backdropFilter: 'blur(20px)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          boxShadow: 'var(--shadow-lg)',
           border: '1px solid var(--border-color)',
         }}
         onClick={(e) => e.stopPropagation()}
@@ -128,7 +128,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 style={{
                   borderColor: theme === t.name ? 'var(--bg-gradient-start)' : 'var(--border-color)',
                   background: theme === t.name
-                    ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)'
+                    ? 'var(--gradient-nav-active)'
                     : 'transparent',
                 }}
               >

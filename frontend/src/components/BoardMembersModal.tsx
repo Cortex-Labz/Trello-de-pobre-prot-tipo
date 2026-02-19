@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Board, User } from '../types';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Board } from '../types';
 import { boardService } from '../services/boardService';
 import { invitationService } from '../services/invitationService';
+import { workspaceService } from '../services/workspaceService';
 import { useAuthStore } from '../store/authStore';
-import UserSearchDropdown from './common/UserSearchDropdown';
+import { useConfirmModal } from '../hooks/useConfirmModal';
 
 interface BoardMembersModalProps {
   board: Board;
@@ -20,10 +21,12 @@ export default function BoardMembersModal({
 }: BoardMembersModalProps) {
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuthStore();
+  const { confirm: confirmAction, ConfirmDialog } = useConfirmModal();
   const [showAddMember, setShowAddMember] = useState(false);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'ADMIN' | 'MEMBER' | 'OBSERVER'>('MEMBER');
+  const [roleDropdownOpen, setRoleDropdownOpen] = useState<string | null>(null);
 
   // Get current user's role in board
   const currentUserMember = board.members?.find(
@@ -54,6 +57,17 @@ export default function BoardMembersModal({
     },
   });
 
+  const updateRoleMutation = useMutation({
+    mutationFn: ({ userId, role }: { userId: string; role: 'ADMIN' | 'MEMBER' | 'OBSERVER' }) =>
+      boardService.updateMemberRole(board.id, userId, role),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['board', board.id] });
+      queryClient.invalidateQueries({ queryKey: ['boards'] });
+      queryClient.invalidateQueries({ queryKey: ['boards', board.workspaceId] });
+      setRoleDropdownOpen(null);
+    },
+  });
+
   const inviteMutation = useMutation({
     mutationFn: ({ email, role }: { email: string; role: 'ADMIN' | 'MEMBER' | 'OBSERVER' }) =>
       invitationService.inviteToBoard(board.id, email, role),
@@ -68,12 +82,18 @@ export default function BoardMembersModal({
     },
   });
 
-  const handleAddMember = (user: User) => {
-    addMemberMutation.mutate({ userId: user.id, role: 'MEMBER' });
+  const handleAddMember = (userId: string) => {
+    addMemberMutation.mutate({ userId, role: 'MEMBER' });
   };
 
-  const handleRemoveMember = (userId: string) => {
-    if (confirm('Tem certeza que deseja remover este membro?')) {
+  const handleRemoveMember = async (userId: string) => {
+    const confirmed = await confirmAction({
+      title: 'Remover membro',
+      message: 'Tem certeza que deseja remover este membro do board?',
+      confirmText: 'Remover',
+      variant: 'danger',
+    });
+    if (confirmed) {
       removeMemberMutation.mutate(userId);
     }
   };
@@ -98,6 +118,18 @@ export default function BoardMembersModal({
 
   // Get list of member user IDs to exclude from search
   const memberUserIds = board.members?.map((m) => m.userId) || [];
+
+  // Fetch workspace members when add member section is open
+  const { data: workspaceMembersData, isLoading: isLoadingMembers } = useQuery({
+    queryKey: ['workspaceMembers', board.workspaceId],
+    queryFn: () => workspaceService.getWorkspaceMembers(board.workspaceId),
+    enabled: showAddMember,
+  });
+
+  // Filter out users who are already board members
+  const availableMembers = workspaceMembersData?.members?.filter(
+    (m: any) => !memberUserIds.includes(m.id)
+  ) || [];
 
   useEffect(() => {
     if (isOpen) {
@@ -124,7 +156,7 @@ export default function BoardMembersModal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        backgroundColor: 'var(--overlay-bg)',
         backdropFilter: 'blur(8px)',
       }}
       onClick={onClose}
@@ -177,22 +209,97 @@ export default function BoardMembersModal({
                 + Adicionar Membro
               </button>
             ) : (
-              <div className="space-y-2">
-                <UserSearchDropdown
-                  onSelectUser={handleAddMember}
-                  excludeUserIds={memberUserIds}
-                  placeholder="Buscar usuário por email ou nome..."
-                />
-                <button
-                  onClick={() => setShowAddMember(false)}
-                  className="text-sm px-3 py-1 rounded-lg"
+              <div className="space-y-3">
+                <div
+                  className="rounded-xl overflow-hidden"
                   style={{
-                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border-color)',
                     background: 'var(--surface-secondary)',
                   }}
                 >
-                  Cancelar
-                </button>
+                  <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      Membros do Workspace
+                    </p>
+                  </div>
+                  {isLoadingMembers ? (
+                    <div className="px-4 py-6 text-center">
+                      <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                        Carregando membros...
+                      </p>
+                    </div>
+                  ) : availableMembers.length === 0 ? (
+                    <div className="px-4 py-6 text-center">
+                      <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                        Todos os membros do workspace ja estao no board
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="max-h-60 overflow-y-auto">
+                      {availableMembers.map((member: any) => (
+                        <div
+                          key={member.id}
+                          className="px-4 py-3 flex items-center gap-3 transition-all"
+                          style={{
+                            borderBottom: '1px solid var(--border-color)',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'var(--surface-hover)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'transparent';
+                          }}
+                        >
+                          {member.avatarUrl ? (
+                            <img
+                              src={member.avatarUrl}
+                              alt={member.name}
+                              className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                              {getInitials(member.name)}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>
+                              {member.name}
+                            </p>
+                            <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
+                              {member.email}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => handleAddMember(member.id)}
+                            disabled={addMemberMutation.isPending}
+                            className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all hover:scale-105"
+                            style={{
+                              background: 'var(--gradient-primary)',
+                              color: 'white',
+                            }}
+                          >
+                            Adicionar
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    Para adicionar, o membro precisa estar no workspace
+                  </p>
+                  <button
+                    onClick={() => setShowAddMember(false)}
+                    className="text-sm px-3 py-1 rounded-lg"
+                    style={{
+                      color: 'var(--text-secondary)',
+                      background: 'var(--surface-secondary)',
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -258,7 +365,7 @@ export default function BoardMembersModal({
                     disabled={inviteMutation.isPending}
                     className="flex-1 px-4 py-2 rounded-lg font-medium transition-all"
                     style={{
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      background: 'var(--gradient-primary)',
                       color: 'white',
                     }}
                   >
@@ -329,24 +436,90 @@ export default function BoardMembersModal({
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <span
-                  className="px-3 py-1 rounded-lg text-sm font-medium"
-                  style={{
-                    background: member.role === 'ADMIN'
-                      ? 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)'
-                      : member.role === 'MEMBER'
-                      ? 'var(--surface-hover)'
-                      : 'transparent',
-                    color: member.role === 'ADMIN'
-                      ? 'white'
-                      : member.role === 'MEMBER'
-                      ? 'var(--text-primary)'
-                      : 'var(--text-secondary)',
-                    border: member.role === 'OBSERVER' ? `1px solid var(--border-color)` : 'none',
-                  }}
-                >
-                  {member.role}
-                </span>
+                {isAdmin && member.userId !== currentUser?.id ? (
+                  <div className="relative">
+                    <button
+                      onClick={() => setRoleDropdownOpen(roleDropdownOpen === member.id ? null : member.id)}
+                      className="px-3 py-1 rounded-lg text-sm font-medium transition-all hover:scale-105 hover:brightness-110 cursor-pointer flex items-center gap-1.5"
+                      style={{
+                        background: member.role === 'ADMIN'
+                          ? 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)'
+                          : member.role === 'MEMBER'
+                          ? 'var(--surface-hover)'
+                          : 'transparent',
+                        color: member.role === 'ADMIN'
+                          ? 'white'
+                          : member.role === 'MEMBER'
+                          ? 'var(--text-primary)'
+                          : 'var(--text-secondary)',
+                        border: member.role === 'OBSERVER' ? '1px solid var(--border-color)' : 'none',
+                      }}
+                    >
+                      {member.role}
+                      <svg className="w-3 h-3 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {roleDropdownOpen === member.id && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setRoleDropdownOpen(null)} />
+                        <div
+                          className="absolute right-0 top-full mt-1 z-20 rounded-xl shadow-xl overflow-hidden"
+                          style={{
+                            background: 'var(--surface-primary)',
+                            border: '1px solid var(--border-color)',
+                            minWidth: '160px',
+                          }}
+                        >
+                          {(['ADMIN', 'MEMBER', 'OBSERVER'] as const).map((role) => (
+                            <button
+                              key={role}
+                              onClick={() => updateRoleMutation.mutate({ userId: member.userId, role })}
+                              disabled={member.role === role || updateRoleMutation.isPending}
+                              className="w-full text-left px-4 py-2.5 text-sm transition-all flex items-center justify-between disabled:opacity-40"
+                              style={{
+                                color: member.role === role ? 'var(--text-secondary)' : 'var(--text-primary)',
+                                background: member.role === role ? 'var(--surface-hover)' : 'transparent',
+                              }}
+                              onMouseEnter={(e) => {
+                                if (member.role !== role) e.currentTarget.style.background = 'var(--surface-hover)';
+                              }}
+                              onMouseLeave={(e) => {
+                                if (member.role !== role) e.currentTarget.style.background = 'transparent';
+                              }}
+                            >
+                              <span className="font-medium">{role}</span>
+                              {member.role === role && (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <span
+                    className="px-3 py-1 rounded-lg text-sm font-medium"
+                    style={{
+                      background: member.role === 'ADMIN'
+                        ? 'linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%)'
+                        : member.role === 'MEMBER'
+                        ? 'var(--surface-hover)'
+                        : 'transparent',
+                      color: member.role === 'ADMIN'
+                        ? 'white'
+                        : member.role === 'MEMBER'
+                        ? 'var(--text-primary)'
+                        : 'var(--text-secondary)',
+                      border: member.role === 'OBSERVER' ? '1px solid var(--border-color)' : 'none',
+                    }}
+                  >
+                    {member.role}
+                  </span>
+                )}
                 {isAdmin && member.userId !== currentUser?.id && (
                   <button
                     onClick={() => handleRemoveMember(member.userId)}
@@ -390,6 +563,7 @@ export default function BoardMembersModal({
           </div>
         </div>
       </div>
+      <ConfirmDialog />
     </div>,
     document.body
   );

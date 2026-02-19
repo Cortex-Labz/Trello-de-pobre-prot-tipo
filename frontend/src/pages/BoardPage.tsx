@@ -1,4 +1,4 @@
-import { useState, memo, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -10,494 +10,18 @@ import { cardService } from '../services/cardService';
 import { labelService } from '../services/labelService';
 import { websocketService } from '../services/websocketService';
 import { useAuthStore } from '../store/authStore';
+import { useConfirmModal } from '../hooks/useConfirmModal';
 import CardModal from '../components/CardModal';
 import ArchivedItemsModal from '../components/ArchivedItemsModal';
 import BoardMembersModal from '../components/BoardMembersModal';
-import ThemeToggle from '../components/common/ThemeToggle';
 import MainLayout from '../components/layout/MainLayout';
+import ListColumn from '../components/board/ListColumn';
+import BoardStatsModal from '../components/BoardStatsModal';
+import CalendarView from '../components/CalendarView';
+import TableView from '../components/TableView';
+import TimelineView from '../components/TimelineView';
 import type { Card } from '../types';
 
-// Helper function to format completion time
-const formatCompletionTime = (minutes: number | null | undefined): string => {
-  if (!minutes || minutes <= 0) return '';
-
-  if (minutes < 1) {
-    // Menos de 1 minuto - mostrar em segundos
-    const seconds = Math.round(minutes * 60);
-    return `${seconds} seg`;
-  } else if (minutes < 60) {
-    // Menos de 1 hora - mostrar em minutos
-    return `${Math.round(minutes)} min`;
-  } else if (minutes < 1440) {
-    // Menos de 1 dia - mostrar em horas e minutos
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.round(minutes % 60);
-    return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
-  } else {
-    // 1 dia ou mais - mostrar em dias e horas
-    const days = Math.floor(minutes / 1440);
-    const hours = Math.floor((minutes % 1440) / 60);
-    return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
-  }
-};
-
-// Memoized Card Component
-const CardItem = memo(({ card, formatTime }: { card: Card; formatTime: (minutes: number | null | undefined) => string }) => {
-  return (
-    <>
-      {/* Card Cover Image - on top, before title */}
-      {card.coverAttachmentId && card.attachments && (() => {
-        const coverImage = card.attachments.find(att => att.id === card.coverAttachmentId);
-        if (coverImage) {
-          return (
-            <div className="overflow-hidden relative group" style={{ margin: '-10px -12px 8px -12px', borderRadius: '10px 10px 0 0' }}>
-              <img
-                src={coverImage.url}
-                alt={coverImage.name}
-                className="w-full object-cover"
-                style={{ maxHeight: '140px', display: 'block' }}
-              />
-            </div>
-          );
-        }
-        return null;
-      })()}
-
-      <div className="flex items-center justify-between gap-2 mb-1">
-        <h4
-          className="font-medium leading-snug flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
-          style={{ color: '#e4e6eb', fontSize: '13px' }}
-          title={card.title}
-        >
-          {card.title}
-          {card.completionTime && (
-            <span
-              className="ml-2 text-xs font-normal"
-              style={{ color: '#10b981' }}
-              title="Tempo de conclusão"
-            >
-              ⏱️ {formatTime(card.completionTime)}
-            </span>
-          )}
-        </h4>
-
-        {/* Due Date - Clock Icon */}
-        {card.dueDate && (
-          <div className="relative group flex-shrink-0">
-            <div
-              className="flex items-center justify-center w-5 h-5 transition-all hover:scale-110 cursor-pointer"
-              style={{
-                color: '#EAB308',
-              }}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            {/* Custom Tooltip */}
-            <div
-              className="absolute top-full right-0 mt-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg"
-              style={{ zIndex: 99999 }}
-            >
-              {new Date(card.dueDate).toLocaleDateString('pt-BR', {
-                day: '2-digit',
-                month: 'long',
-                year: 'numeric',
-              })}
-              <div className="absolute bottom-full right-2 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-900 dark:border-b-gray-700"></div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {card.description && (
-        <p className="mt-1 line-clamp-2 leading-snug" style={{ color: '#6b7084', fontSize: '11.5px' }}>
-          {card.description}
-        </p>
-      )}
-
-      {/* Card Footer */}
-      {((card.labels?.length || 0) > 0 || (card.members?.length || 0) > 0) && (
-        <div className="flex items-center gap-1.5 mt-2 pt-2 border-t" style={{ borderColor: 'rgba(255, 255, 255, 0.04)' }}>
-          {/* Labels */}
-          {card.labels && card.labels.length > 0 && (
-            <div className="flex gap-1 flex-wrap">
-              {card.labels.slice(0, 3).map((cl) => (
-                <div
-                  key={cl.label.id}
-                  className="px-2 py-0.5 rounded text-white font-semibold"
-                  // Label matching mockup size
-                  style={{ backgroundColor: cl.label.color, fontSize: '10px', lineHeight: '1.4' }}
-                  title={cl.label.name}
-                >
-                  {cl.label.name}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Members */}
-          {card.members && card.members.length > 0 && (
-            <div className="flex -space-x-2 ml-auto">
-              {card.members.slice(0, 3).map((cm) => (
-                <div
-                  key={cm.id}
-                  className="w-[22px] h-[22px] rounded-full flex items-center justify-center text-white font-bold"
-                  style={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    fontSize: '9px',
-                    marginLeft: '-4px',
-                    border: '1.5px solid rgba(25, 28, 40, 0.9)',
-                  }}
-                  title={cm.user.name}
-                >
-                  {cm.user.name.charAt(0).toUpperCase()}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </>
-  );
-});
-
-CardItem.displayName = 'CardItem';
-
-// Memoized List Component to prevent re-renders
-const ListColumn = memo(
-  ({
-    list,
-    showNewCard,
-    newCardTitle,
-    onShowNewCard,
-    onNewCardTitleChange,
-    onCreateCard,
-    onCancelNewCard,
-    isCreatingCard,
-    draggingCardId,
-    onCardClick,
-    onCardContextMenu,
-    onListMenuClick,
-    onRenameList,
-    searchTerm,
-    highlightedCards,
-  }: {
-    list: any;
-    showNewCard: boolean;
-    newCardTitle: string;
-    onShowNewCard: () => void;
-    onNewCardTitleChange: (value: string) => void;
-    onCreateCard: () => void;
-    onCancelNewCard: () => void;
-    isCreatingCard: boolean;
-    draggingCardId: string | null;
-    onCardClick: (card: Card) => void;
-    onCardContextMenu: (e: React.MouseEvent, card: Card) => void;
-    onListMenuClick: (e: React.MouseEvent, list: any) => void;
-    onRenameList: (listId: string, newTitle: string) => void;
-    searchTerm: string;
-    highlightedCards: Set<string>;
-  }) => {
-    const [isEditingTitle, setIsEditingTitle] = useState(false);
-    const [editedTitle, setEditedTitle] = useState(list.title);
-
-    const handleStartEditing = () => {
-      setIsEditingTitle(true);
-      setEditedTitle(list.title);
-    };
-
-    const handleFinishEditing = () => {
-      if (editedTitle.trim() && editedTitle !== list.title) {
-        onRenameList(list.id, editedTitle.trim());
-      } else {
-        setEditedTitle(list.title);
-      }
-      setIsEditingTitle(false);
-    };
-
-    const handleCancelEditing = () => {
-      setEditedTitle(list.title);
-      setIsEditingTitle(false);
-    };
-
-    return (
-      <div
-        className="flex-shrink-0 w-[280px] rounded-[14px] overflow-hidden transition-all duration-300"
-        style={{
-          transform: 'none',
-          background: '#12141c',
-          border: '1px solid rgba(255, 255, 255, 0.06)',
-          boxShadow: list.backgroundColor
-            ? `0 4px 20px -2px ${list.backgroundColor.includes('gradient')
-                ? 'rgba(102, 126, 234, 0.15)'
-                : list.backgroundColor + '40'}, 0 2px 8px rgba(0, 0, 0, 0.15)`
-            : '0 4px 20px rgba(0, 0, 0, 0.15)',
-        }}
-      >
-        <div
-          className="flex flex-col max-h-full h-full"
-        >
-        {/* List Header */}
-        <div
-          className="group relative overflow-hidden"
-          // List header padding matching mockup
-          style={{
-            padding: '12px 14px 10px',
-            background: 'transparent',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-          }}
-        >
-          {/* Barra colorida no topo */}
-          {list.backgroundColor && (
-            <div
-              className="absolute top-0 left-0 right-0 h-[3px]"
-              style={{
-                background: list.backgroundColor,
-              }}
-            />
-          )}
-
-          <div className="flex items-center justify-between gap-2 relative z-10">
-            {isEditingTitle ? (
-              <input
-                type="text"
-                value={editedTitle}
-                onChange={(e) => setEditedTitle(e.target.value)}
-                onBlur={handleFinishEditing}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleFinishEditing();
-                  }
-                  if (e.key === 'Escape') {
-                    handleCancelEditing();
-                  }
-                }}
-                className="font-semibold flex-1 px-1.5 py-0.5 rounded-md focus:outline-none"
-                style={{
-                  color: '#e4e6eb',
-                  fontSize: '13.5px',
-                  background: 'rgba(31, 35, 51, 0.9)',
-                  border: '1.5px solid rgba(102, 126, 234, 0.5)',
-                }}
-                autoFocus
-                onFocus={(e) => e.target.select()}
-              />
-            ) : (
-              <h3
-                className="font-semibold flex-1 cursor-pointer px-1.5 py-0.5 rounded-md hover:bg-opacity-50 transition-all"
-                style={{ color: '#e4e6eb', fontSize: '13.5px' }}
-                onClick={handleStartEditing}
-                onDoubleClick={handleStartEditing}
-                title="Clique para renomear"
-              >
-                {list.title}
-              </h3>
-            )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onListMenuClick(e, list);
-              }}
-              className="w-[26px] h-[26px] rounded-[7px] flex items-center justify-center transition-all hover:scale-110 opacity-0 group-hover:opacity-100 flex-shrink-0"
-              style={{
-                background: 'transparent',
-                color: '#5a5f73',
-              }}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-              </svg>
-            </button>
-            <span
-              className="font-semibold px-2 rounded-[10px] flex-shrink-0"
-              // Count badge matching mockup
-              style={{
-                color: '#5a5f73',
-                fontSize: '11px',
-                padding: '2px 8px',
-                background: 'rgba(255, 255, 255, 0.05)',
-              }}
-            >
-              {list.cards?.length || 0}
-            </span>
-          </div>
-        </div>
-
-        {/* Cards Container */}
-        <Droppable droppableId={list.id} type="CARD">
-          {(provided, snapshot) => (
-            <div
-              {...provided.droppableProps}
-              ref={provided.innerRef}
-              className="flex-1 overflow-y-auto flex flex-col gap-2"
-              // Cards container padding via style
-              style={{
-                minHeight: '10px',
-                padding: '2px 10px 6px',
-                background: snapshot.isDraggingOver ? 'rgba(102, 126, 234, 0.05)' : 'transparent',
-                transition: 'background 0.2s ease',
-              }}
-            >
-              {list.cards
-                ?.filter((card: Card) => {
-                  if (!searchTerm) return true;
-                  const search = searchTerm.toLowerCase();
-                  return (
-                    card.title?.toLowerCase().includes(search) ||
-                    card.description?.toLowerCase().includes(search) ||
-                    card.labels?.some(cl => cl.label?.name?.toLowerCase().includes(search))
-                  );
-                })
-                .map((card: Card, index: number) => {
-                // Esconde o card da posição original quando está sendo arrastado
-                const isBeingDragged = draggingCardId === card.id;
-
-                const isHighlighted = highlightedCards.has(card.id);
-
-                return (
-                  <Draggable key={card.id} draggableId={card.id} index={index}>
-                    {(provided, snapshot) => (
-                      <motion.div
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
-                        {...provided.dragHandleProps}
-                        onClick={() => !snapshot.isDragging && onCardClick(card)}
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          onCardContextMenu(e, card);
-                        }}
-                        className="rounded-[10px] cursor-pointer transition-all hover:scale-[1.02] group"
-                        style={{
-                          ...provided.draggableProps.style,
-                          padding: '10px 12px',
-                          background: 'rgba(25, 28, 40, 0.7)',
-                          border: isHighlighted
-                            ? '2px solid rgba(102, 126, 234, 0.6)'
-                            : '1px solid rgba(255, 255, 255, 0.04)',
-                          boxShadow: snapshot.isDragging
-                            ? '0 12px 32px rgba(0, 0, 0, 0.5)'
-                            : isHighlighted
-                            ? '0 0 16px rgba(102, 126, 234, 0.2)'
-                            : 'none',
-                          opacity: isBeingDragged && !snapshot.isDragging ? 0 : 1,
-                          pointerEvents: isBeingDragged && !snapshot.isDragging ? 'none' : 'auto',
-                        }}
-                        animate={!snapshot.isDragging && isHighlighted ? {
-                          scale: [1, 1.03, 1],
-                          transition: { duration: 0.5, ease: "easeInOut" }
-                        } : {}}
-                      >
-                        <CardItem card={card} formatTime={formatCompletionTime} />
-                      </motion.div>
-                    )}
-                  </Draggable>
-                );
-              })}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-
-        {/* Add Card Button - Outside droppable so it gets pushed down */}
-        <div style={{ padding: '6px 10px 10px' }}>
-          {showNewCard ? (
-            <div
-              className="rounded-lg p-3 shadow-sm"
-              style={{
-                background: 'rgba(25, 28, 40, 0.6)',
-                border: '1px solid rgba(102, 126, 234, 0.15)',
-              }}
-            >
-              <textarea
-                value={newCardTitle}
-                onChange={(e) => onNewCardTitleChange(e.target.value)}
-                placeholder="Digite o título do card..."
-                className="w-full px-3 py-2 rounded-lg focus:outline-none resize-none text-sm"
-                style={{
-                  background: 'rgba(15, 17, 23, 0.6)',
-                  color: 'var(--text-primary)',
-                  border: '1.5px solid rgba(102, 126, 234, 0.2)',
-                }}
-                rows={2}
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    onCreateCard();
-                  }
-                  if (e.key === 'Escape') {
-                    onCancelNewCard();
-                  }
-                }}
-              />
-              <div className="flex gap-2 mt-2">
-                <button
-                  onClick={onCreateCard}
-                  disabled={!newCardTitle.trim() || isCreatingCard}
-                  className="px-4 py-2 text-white rounded-lg transition-all text-sm font-semibold disabled:opacity-50 hover:scale-105"
-                  style={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  }}
-                >
-                  Adicionar
-                </button>
-                <button
-                  onClick={onCancelNewCard}
-                  className="px-3 py-2 rounded-lg transition-all text-sm font-medium hover:scale-105"
-                  style={{
-                    color: '#8b8fa3',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                  }}
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={onShowNewCard}
-              className="w-full rounded-lg transition-all font-medium text-left flex items-center gap-1.5 hover:scale-[1.02] hover:shadow-sm"
-              style={{
-                padding: '8px 10px',
-                borderRadius: '8px',
-                color: '#5a5f73',
-                fontSize: '12px',
-                background: 'transparent',
-                border: '1.5px dashed rgba(255, 255, 255, 0.08)',
-              }}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Adicionar card
-            </button>
-          )}
-        </div>
-        </div>
-      </div>
-    );
-  },
-  (prevProps, nextProps) => {
-    // Only re-render if cards changed or add card form state changed
-    return (
-      JSON.stringify(prevProps.list) === JSON.stringify(nextProps.list) &&
-      prevProps.showNewCard === nextProps.showNewCard &&
-      prevProps.newCardTitle === nextProps.newCardTitle &&
-      prevProps.isCreatingCard === nextProps.isCreatingCard &&
-      prevProps.draggingCardId === nextProps.draggingCardId &&
-      prevProps.onCardClick === nextProps.onCardClick &&
-      prevProps.onRenameList === nextProps.onRenameList
-    );
-  }
-);
-
-ListColumn.displayName = 'ListColumn';
 
 export default function BoardPage() {
   const { boardId } = useParams<{ boardId: string }>();
@@ -505,8 +29,10 @@ export default function BoardPage() {
   const navigate = useNavigate();
   const { user, token, logout } = useAuthStore();
   const queryClient = useQueryClient();
+  const { confirm: confirmAction, ConfirmDialog } = useConfirmModal();
 
 
+  const [viewMode, setViewMode] = useState<'board' | 'calendar' | 'table' | 'timeline'>('board');
   const [showNewList, setShowNewList] = useState(false);
   const [newListTitle, setNewListTitle] = useState('');
   const [showNewCard, setShowNewCard] = useState<string | null>(null);
@@ -530,10 +56,21 @@ export default function BoardPage() {
   const [showBackgroundModal, setShowBackgroundModal] = useState(false);
   const [showArchivedModal, setShowArchivedModal] = useState(false);
   const [showMembersModal, setShowMembersModal] = useState(false);
+  const [showStatsModal, setShowStatsModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [backgroundType, setBackgroundType] = useState<'color' | 'image'>('color');
   const [customBoardColor, setCustomBoardColor] = useState('#0079bf');
   const [highlightedCards, setHighlightedCards] = useState<Set<string>>(new Set());
+
+  // Filter state
+  const [filterLabel, setFilterLabel] = useState<string>('');
+  const [filterMember, setFilterMember] = useState<string>('');
+  const [filterDueDate, setFilterDueDate] = useState<string>('');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Keyboard shortcuts state
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Track local actions to prevent duplicate updates from WebSocket
   const localActionInProgress = useRef(false);
@@ -669,6 +206,87 @@ export default function BoardPage() {
     };
   }, [boardId, token, queryClient]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = document.activeElement?.tagName;
+      const isInInput = tag === 'INPUT' || tag === 'TEXTAREA';
+      const isInDialog = !!document.activeElement?.closest('[role="dialog"]');
+
+      // Escape always works (to close things)
+      if (e.key === 'Escape') {
+        if (showShortcuts) {
+          setShowShortcuts(false);
+          return;
+        }
+        if (cardMenuOpen) {
+          setCardMenuOpen(null);
+          return;
+        }
+        if (listMenuOpen) {
+          setListMenuOpen(null);
+          return;
+        }
+        if (editingListColor) {
+          setEditingListColor(null);
+          return;
+        }
+        if (searchTerm) {
+          setSearchTerm('');
+          searchInputRef.current?.blur();
+          return;
+        }
+        return;
+      }
+
+      // Don't trigger shortcuts when typing in inputs or inside dialogs
+      if (isInInput || isInDialog) return;
+
+      // Don't trigger if any modal is open
+      if (selectedCard || editingCardTitle || showBackgroundModal || showArchivedModal || showMembersModal || cardMenuOpen || listMenuOpen || editingListColor || cardDateDropdownOpen || cardCoverDropdownOpen || cardMembersDropdownOpen || cardLabelsDropdownOpen) return;
+
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setShowShortcuts(true);
+        return;
+      }
+
+      if (e.key === '/' || (e.key === 'k' && (e.ctrlKey || e.metaKey))) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      const keyLower = e.key.toLowerCase();
+
+      if (keyLower === 'n' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        // Focus the add card button of the first list
+        const currentLists = boardData?.board?.lists || [];
+        if (currentLists.length > 0) {
+          const firstListId = currentLists[0].id;
+          if (showNewCard === firstListId) {
+            // Already showing, close it
+            setShowNewCard(null);
+            setNewCardTitle('');
+          } else {
+            setShowNewCard(firstListId);
+          }
+        }
+        return;
+      }
+
+      if (keyLower === 'f' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setShowFilters(prev => !prev);
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showShortcuts, cardMenuOpen, listMenuOpen, editingListColor, searchTerm, selectedCard, editingCardTitle, showBackgroundModal, showArchivedModal, showMembersModal, cardDateDropdownOpen, cardCoverDropdownOpen, cardMembersDropdownOpen, cardLabelsDropdownOpen, showNewCard, boardData]);
+
   const createListMutation = useMutation({
     mutationFn: (data: { boardId: string; title: string; position: number }) =>
       listService.createList(data),
@@ -704,11 +322,17 @@ export default function BoardPage() {
     mutationFn: (data: { cardId: string; listId: string; position: number }) =>
       cardService.moveCard(data.cardId, { listId: data.listId, position: data.position }),
     onMutate: () => {
-      // Mark that a local action is in progress
       localActionInProgress.current = true;
+      // Save previous state for rollback
+      return { previousBoard: queryClient.getQueryData(['board', boardId]) };
+    },
+    onError: (_err, _vars, context) => {
+      // Rollback to previous state on error
+      if (context?.previousBoard) {
+        queryClient.setQueryData(['board', boardId], context.previousBoard);
+      }
     },
     onSettled: () => {
-      // Reset the flag after a short delay to allow WebSocket event to be ignored
       setTimeout(() => {
         localActionInProgress.current = false;
       }, 500);
@@ -787,7 +411,7 @@ export default function BoardPage() {
 
   const addCardLabelMutation = useMutation({
     mutationFn: (data: { cardId: string; labelId: string }) =>
-      labelService.addLabelToCard(data.cardId, data.labelId),
+      labelService.addLabelToCard(data.labelId, data.cardId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board', boardId] });
     },
@@ -795,7 +419,7 @@ export default function BoardPage() {
 
   const removeCardLabelMutation = useMutation({
     mutationFn: (data: { cardId: string; labelId: string }) =>
-      labelService.removeLabelFromCard(data.cardId, data.labelId),
+      labelService.removeLabelFromCard(data.labelId, data.cardId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board', boardId] });
     },
@@ -894,58 +518,84 @@ export default function BoardPage() {
   };
 
   const handleDragStart = (result: any) => {
-    // Marca o card que está sendo arrastado como invisível
-    setDraggingCardId(result.draggableId);
+    if (result.type === 'CARD') {
+      setDraggingCardId(result.draggableId);
+    }
   };
 
+  const reorderListsMutation = useMutation({
+    mutationFn: (lists: Array<{ id: string; position: number }>) =>
+      listService.reorderLists(lists),
+    onMutate: () => {
+      localActionInProgress.current = true;
+      return { previousBoard: queryClient.getQueryData(['board', boardId]) };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousBoard) {
+        queryClient.setQueryData(['board', boardId], context.previousBoard);
+      }
+    },
+    onSettled: () => {
+      setTimeout(() => {
+        localActionInProgress.current = false;
+      }, 500);
+    },
+  });
+
   const handleDragEnd = (result: DropResult) => {
-    const { destination, source, draggableId } = result;
+    const { destination, source, draggableId, type } = result;
 
     // Limpa o estado de dragging
     setDraggingCardId(null);
 
-    // Dropped outside any list
-    if (!destination) {
-      return;
-    }
+    // Dropped outside
+    if (!destination) return;
 
     // Dropped in the same position
-    if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
-    ) {
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+
+    // === LIST REORDER ===
+    if (type === 'LIST') {
+      queryClient.setQueryData(['board', boardId], (old: any) => {
+        if (!old?.board?.lists) return old;
+        const newLists = [...old.board.lists];
+        const [movedList] = newLists.splice(source.index, 1);
+        newLists.splice(destination.index, 0, movedList);
+        return { ...old, board: { ...old.board, lists: newLists } };
+      });
+
+      // Build reorder payload
+      const currentLists = (queryClient.getQueryData(['board', boardId]) as any)?.board?.lists || [];
+      const reorderPayload = currentLists.map((list: any, index: number) => ({
+        id: list.id,
+        position: index,
+      }));
+      reorderListsMutation.mutate(reorderPayload);
       return;
     }
 
-    // Immediately update UI (optimistic)
+    // === CARD MOVE ===
     queryClient.setQueryData(['board', boardId], (old: any) => {
       if (!old?.board?.lists) return old;
 
-      // Find the card being moved
       const movedCard = old.board.lists
         .flatMap((l: any) => l.cards || [])
         .find((c: any) => c.id === draggableId);
 
       if (!movedCard) return old;
 
-      // Create new lists array with card moved
       const newLists = old.board.lists.map((list: any) => {
-        // Remove card from all lists first
         let cards = (list.cards || []).filter((c: any) => c.id !== draggableId);
-
-        // Add card to destination list at the right position
         if (list.id === destination.droppableId) {
           cards = [...cards];
           cards.splice(destination.index, 0, { ...movedCard, listId: destination.droppableId });
         }
-
         return { ...list, cards };
       });
 
       return { ...old, board: { ...old.board, lists: newLists } };
     });
 
-    // Then call API
     moveCardMutation.mutate({
       cardId: draggableId,
       listId: destination.droppableId,
@@ -960,11 +610,29 @@ export default function BoardPage() {
 
   const handleCardContextMenu = (e: React.MouseEvent, card: Card) => {
     e.stopPropagation();
-    setCardMenuOpen({ card, x: e.clientX, y: e.clientY });
+    const menuHeight = 400; // approximate menu height
+    const menuWidth = 220;
+    const viewportH = window.innerHeight;
+    const viewportW = window.innerWidth;
+    let x = e.clientX;
+    let y = e.clientY;
+    if (y + menuHeight > viewportH) {
+      y = Math.max(8, viewportH - menuHeight);
+    }
+    if (x + menuWidth > viewportW) {
+      x = Math.max(8, viewportW - menuWidth);
+    }
+    setCardMenuOpen({ card, x, y });
   };
 
-  const handleDeleteCard = (cardId: string) => {
-    if (confirm('Tem certeza que deseja deletar este card?')) {
+  const handleDeleteCard = async (cardId: string) => {
+    const confirmed = await confirmAction({
+      title: 'Deletar card',
+      message: 'Tem certeza que deseja deletar este card? Esta acao nao pode ser desfeita.',
+      confirmText: 'Deletar',
+      variant: 'danger',
+    });
+    if (confirmed) {
       deleteCardMutation.mutate(cardId);
     }
   };
@@ -1071,8 +739,14 @@ export default function BoardPage() {
     setCardMenuOpen(null);
   };
 
-  const handleDeleteList = (listId: string) => {
-    if (confirm('Tem certeza que deseja deletar esta lista?')) {
+  const handleDeleteList = async (listId: string) => {
+    const confirmed = await confirmAction({
+      title: 'Deletar lista',
+      message: 'Tem certeza que deseja deletar esta lista? Todos os cards serao removidos.',
+      confirmText: 'Deletar',
+      variant: 'danger',
+    });
+    if (confirmed) {
       deleteListMutation.mutate(listId);
     }
   };
@@ -1118,19 +792,145 @@ export default function BoardPage() {
   const board = boardData?.board;
   const lists = board?.lists || [];
 
+  // Filter logic
+  const hasActiveFilters = filterLabel !== '' || filterMember !== '' || filterDueDate !== '';
+
+  const filterCards = useCallback((cards: Card[]) => {
+    if (!hasActiveFilters) return cards;
+    return cards.filter(card => {
+      // Label filter
+      if (filterLabel && !card.labels?.some(cl => cl.label.id === filterLabel)) return false;
+
+      // Member filter
+      if (filterMember && !card.members?.some(cm => cm.user.id === filterMember)) return false;
+
+      // Due date filter
+      if (filterDueDate) {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+        if (filterDueDate === 'overdue') {
+          if (!card.dueDate || new Date(card.dueDate) >= now) return false;
+        } else if (filterDueDate === 'today') {
+          if (!card.dueDate) return false;
+          const due = new Date(card.dueDate);
+          if (due < today || due >= new Date(today.getTime() + 24 * 60 * 60 * 1000)) return false;
+        } else if (filterDueDate === 'week') {
+          if (!card.dueDate) return false;
+          const due = new Date(card.dueDate);
+          if (due < today || due > weekFromNow) return false;
+        } else if (filterDueDate === 'none') {
+          if (card.dueDate) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [filterLabel, filterMember, filterDueDate, hasActiveFilters]);
+
+  // Compute filtered lists (cards filtered before passing to ListColumn)
+  const filteredLists = useMemo(() => {
+    if (!hasActiveFilters) return lists;
+    return lists.map((list: any) => ({
+      ...list,
+      cards: filterCards(list.cards || []),
+    }));
+  }, [lists, filterCards, hasActiveFilters]);
+
+  // Card count stats for filter badge
+  const filterStats = useMemo(() => {
+    if (!hasActiveFilters) return null;
+    const totalCards = lists.reduce((sum: number, list: any) => sum + (list.cards?.length || 0), 0);
+    const visibleCards = filteredLists.reduce((sum: number, list: any) => sum + (list.cards?.length || 0), 0);
+    return { total: totalCards, visible: visibleCards };
+  }, [lists, filteredLists, hasActiveFilters]);
+
+  const clearAllFilters = useCallback(() => {
+    setFilterLabel('');
+    setFilterMember('');
+    setFilterDueDate('');
+  }, []);
+
   if (isLoading) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        }}
-      >
+      <MainLayout>
         <div
-          className="inline-block animate-spin rounded-full h-12 w-12 border-b-2"
-          style={{ borderColor: 'var(--surface-primary)' }}
-        ></div>
-      </div>
+          className="flex flex-col h-full"
+          style={{ background: 'var(--surface-board)' }}
+        >
+          {/* Skeleton Board Header */}
+          <div
+            className="rounded-[14px]"
+            style={{
+              margin: '12px 16px 0',
+              background: 'var(--surface-board-header)',
+              border: '1px solid var(--border-default)',
+              padding: '10px 16px',
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-[34px] h-[34px] rounded-[9px] animate-pulse" style={{ background: 'var(--border-default)' }} />
+              <div style={{ width: '1px', height: '24px', background: 'var(--border-visible)' }} />
+              <div className="flex-1">
+                <div className="h-4 w-40 rounded animate-pulse" style={{ background: 'var(--border-visible)' }} />
+                <div className="h-3 w-24 rounded animate-pulse mt-1" style={{ background: 'var(--surface-subtle)' }} />
+              </div>
+              <div className="flex gap-2">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="w-8 h-8 rounded-lg animate-pulse" style={{ background: 'var(--border-default)' }} />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Skeleton Lists */}
+          <div className="flex-1 flex gap-[14px] overflow-hidden" style={{ padding: '16px 16px 12px' }}>
+            {[3, 4, 2].map((cardCount, listIdx) => (
+              <div
+                key={listIdx}
+                className="flex-shrink-0 w-[280px] rounded-[14px]"
+                style={{
+                  background: 'var(--surface-overlay)',
+                  border: '1px solid var(--border-default)',
+                  padding: '14px',
+                }}
+              >
+                {/* List title skeleton */}
+                <div className="h-4 rounded animate-pulse mb-4" style={{ background: 'var(--border-visible)', width: `${60 + listIdx * 15}%` }} />
+                {/* Card skeletons */}
+                <div className="flex flex-col gap-2">
+                  {Array.from({ length: cardCount }).map((_, cardIdx) => (
+                    <div
+                      key={cardIdx}
+                      className="rounded-[10px] animate-pulse"
+                      style={{
+                        background: 'var(--surface-card)',
+                        border: '1px solid var(--border-subtle)',
+                        padding: '10px 12px',
+                      }}
+                    >
+                      {cardIdx === 0 && listIdx === 1 && (
+                        <div className="h-20 rounded-lg mb-2" style={{ background: 'var(--surface-subtle)', margin: '-10px -12px 8px -12px', borderRadius: '10px 10px 0 0' }} />
+                      )}
+                      <div className="flex items-center gap-2">
+                        <div className="w-[18px] h-[18px] rounded-full flex-shrink-0" style={{ border: '2px solid var(--border-visible)' }} />
+                        <div className="h-3 rounded flex-1" style={{ background: 'var(--border-visible)', width: `${50 + cardIdx * 10}%` }} />
+                      </div>
+                      {cardIdx % 2 === 0 && (
+                        <div className="flex gap-1 mt-2">
+                          <div className="h-2 w-10 rounded" style={{ background: 'var(--accent-bg-medium)' }} />
+                          <div className="h-2 w-8 rounded" style={{ background: 'var(--accent-bg-medium)' }} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </MainLayout>
     );
   }
 
@@ -1139,7 +939,7 @@ export default function BoardPage() {
       <div
         className="min-h-screen flex items-center justify-center"
         style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          background: 'var(--gradient-primary)',
         }}
       >
         <div className="text-center">
@@ -1149,7 +949,7 @@ export default function BoardPage() {
           <Link
             to="/dashboard"
             className="font-medium"
-            style={{ color: '#667eea' }}
+            style={{ color: 'var(--accent)' }}
           >
             Voltar para Dashboard
           </Link>
@@ -1170,7 +970,7 @@ export default function BoardPage() {
     if (board?.backgroundColor && board.backgroundColor !== '#667eea') {
       return { background: board.backgroundColor };
     }
-    return { background: 'linear-gradient(145deg, #1a1d2e 0%, #2d1b4e 35%, #1b2a4a 65%, #141825 100%)' };
+    return { background: 'var(--surface-board)' };
   };
 
   return (
@@ -1194,10 +994,10 @@ export default function BoardPage() {
           // margin applied via style for precise control
           style={{
             margin: '12px 16px 0',
-            background: 'rgba(15, 17, 23, 0.6)',
+            background: 'var(--surface-board-header)',
             backdropFilter: 'blur(24px)',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
-            boxShadow: '0 4px 24px rgba(0, 0, 0, 0.25)',
+            border: '1px solid var(--border-default)',
+            boxShadow: 'var(--shadow-lg)',
           }}
         >
           <div className="flex items-center gap-3" style={{ padding: '10px 16px' }}>
@@ -1205,8 +1005,8 @@ export default function BoardPage() {
               to="/dashboard"
               className="w-[34px] h-[34px] rounded-[9px] flex items-center justify-center transition-all hover:translate-x-[-2px] flex-shrink-0"
               style={{
-                background: 'rgba(255, 255, 255, 0.06)',
-                color: '#b8bcc8',
+                background: 'var(--border-default)',
+                color: 'var(--text-secondary)',
               }}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1220,19 +1020,19 @@ export default function BoardPage() {
             </Link>
 
             {/* Divider */}
-            <div className="flex-shrink-0" style={{ width: '1px', height: '24px', background: 'rgba(255, 255, 255, 0.08)' }} />
+            <div className="flex-shrink-0" style={{ width: '1px', height: '24px', background: 'var(--border-visible)' }} />
 
             <div className="flex-1 min-w-0">
               <h1
                 className="text-[16px] font-bold leading-tight truncate"
-                style={{ color: '#e4e6eb', letterSpacing: '-0.3px' }}
+                style={{ color: 'var(--text-primary)', letterSpacing: '-0.3px' }}
               >
                 {board.name}
               </h1>
               {board.description && (
                 <span
                   className="text-[11px]"
-                  style={{ color: '#6b7084' }}
+                  style={{ color: 'var(--text-disabled)' }}
                 >
                   {board.description}
                 </span>
@@ -1246,13 +1046,13 @@ export default function BoardPage() {
                 style={{
                   padding: '7px 12px',
                   borderRadius: '9px',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  background: 'var(--surface-subtle)',
+                  border: '1px solid var(--border-default)',
                 }}
               >
                 <svg
                   className="w-3.5 h-3.5 flex-shrink-0"
-                  style={{ color: '#5a5f73' }}
+                  style={{ color: 'var(--text-dimmed)' }}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1265,18 +1065,19 @@ export default function BoardPage() {
                   />
                 </svg>
                 <input
+                  ref={searchInputRef}
                   type="text"
                   placeholder="Buscar cards..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full bg-transparent border-none outline-none text-xs"
-                  style={{ color: '#e4e6eb' }}
+                  style={{ color: 'var(--text-primary)' }}
                 />
                 {searchTerm && (
                   <button
                     onClick={() => setSearchTerm('')}
                     className="flex-shrink-0"
-                    style={{ color: '#5a5f73' }}
+                    style={{ color: 'var(--text-dimmed)' }}
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1304,7 +1105,7 @@ export default function BoardPage() {
                         height: '28px',
                         borderRadius: '50%',
                         background: gradients[idx % gradients.length],
-                        border: '2px solid rgba(15, 17, 23, 0.8)',
+                        border: '2px solid var(--surface-board-header)',
                         marginLeft: idx === 0 ? '0' : '-6px',
                         fontSize: '10px',
                         fontWeight: 700,
@@ -1324,8 +1125,8 @@ export default function BoardPage() {
                       width: '28px',
                       height: '28px',
                       borderRadius: '50%',
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      border: '2px solid rgba(15, 17, 23, 0.8)',
+                      background: 'var(--border-visible)',
+                      border: '2px solid var(--surface-board-header)',
                       marginLeft: '-6px',
                       fontSize: '10px',
                       fontWeight: 700,
@@ -1338,14 +1139,123 @@ export default function BoardPage() {
             )}
 
             <div className="flex items-center gap-2 flex-shrink-0">
+            {/* View Mode Toggle */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                borderRadius: '9px',
+                background: 'var(--surface-subtle)',
+                border: '1px solid var(--border-default)',
+                padding: '2px',
+                gap: '2px',
+              }}
+            >
+              <button
+                onClick={() => setViewMode('board')}
+                title="Visão Board"
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '7px',
+                  background: viewMode === 'board' ? 'var(--accent-bg-medium)' : 'transparent',
+                  color: viewMode === 'board' ? 'var(--accent)' : 'var(--text-dimmed)',
+                  border: viewMode === 'board' ? '1px solid var(--border-accent)' : '1px solid transparent',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                </svg>
+                Board
+              </button>
+              <button
+                onClick={() => setViewMode('calendar')}
+                title="Visão Calendário"
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '7px',
+                  background: viewMode === 'calendar' ? 'var(--accent-bg-medium)' : 'transparent',
+                  color: viewMode === 'calendar' ? 'var(--accent)' : 'var(--text-dimmed)',
+                  border: viewMode === 'calendar' ? '1px solid var(--border-accent)' : '1px solid transparent',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Calendário
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                title="Visão Tabela"
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '7px',
+                  background: viewMode === 'table' ? 'var(--accent-bg-medium)' : 'transparent',
+                  color: viewMode === 'table' ? 'var(--accent)' : 'var(--text-dimmed)',
+                  border: viewMode === 'table' ? '1px solid var(--border-accent)' : '1px solid transparent',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18M3 6h18M3 18h18" />
+                </svg>
+                Tabela
+              </button>
+              <button
+                onClick={() => setViewMode('timeline')}
+                title="Visão Timeline"
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '7px',
+                  background: viewMode === 'timeline' ? 'var(--accent-bg-medium)' : 'transparent',
+                  color: viewMode === 'timeline' ? 'var(--accent)' : 'var(--text-dimmed)',
+                  border: viewMode === 'timeline' ? '1px solid var(--border-accent)' : '1px solid transparent',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                Timeline
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div style={{ width: '1px', height: '20px', background: 'var(--border-visible)' }} />
+
             <button
               onClick={() => setShowMembersModal(true)}
               className="flex items-center gap-1.5 transition-all hover:scale-105"
               style={{
                 padding: '7px 14px',
                 borderRadius: '9px',
-                background: 'rgba(255, 255, 255, 0.06)',
-                color: '#b8bcc8',
+                background: 'var(--border-default)',
+                color: 'var(--text-secondary)',
                 fontSize: '12px',
                 fontWeight: 500,
                 border: 'none',
@@ -1363,8 +1273,8 @@ export default function BoardPage() {
               style={{
                 padding: '7px 14px',
                 borderRadius: '9px',
-                background: 'rgba(255, 255, 255, 0.06)',
-                color: '#b8bcc8',
+                background: 'var(--border-default)',
+                color: 'var(--text-secondary)',
                 fontSize: '12px',
                 fontWeight: 500,
                 border: 'none',
@@ -1382,8 +1292,8 @@ export default function BoardPage() {
               style={{
                 padding: '7px 14px',
                 borderRadius: '9px',
-                background: 'rgba(255, 255, 255, 0.06)',
-                color: '#b8bcc8',
+                background: 'var(--border-default)',
+                color: 'var(--text-secondary)',
                 fontSize: '12px',
                 fontWeight: 500,
                 border: 'none',
@@ -1394,47 +1304,320 @@ export default function BoardPage() {
               </svg>
               Arquivados
             </button>
+
+            <button
+              onClick={() => setShowStatsModal(true)}
+              className="flex items-center gap-1.5 transition-all hover:scale-105"
+              style={{
+                padding: '7px 14px',
+                borderRadius: '9px',
+                background: 'var(--border-default)',
+                color: 'var(--text-secondary)',
+                fontSize: '12px',
+                fontWeight: 500,
+                border: 'none',
+              }}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Estatísticas
+            </button>
             </div>
           </div>
         </div>
 
-        {/* Board Content */}
-        <div className="flex-1 overflow-x-auto overflow-y-hidden relative z-10" style={{ padding: '16px 16px 12px' }}>
-        <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="flex h-full items-start" style={{ gap: '14px' }}>
-            {/* Lists */}
-            {lists.map((list) => (
-              <ListColumn
-                key={list.id}
-                list={list}
-                showNewCard={showNewCard === list.id}
-                newCardTitle={newCardTitle}
-                onShowNewCard={() => setShowNewCard(list.id)}
-                onNewCardTitleChange={setNewCardTitle}
-                onCreateCard={() => handleCreateCard(list.id)}
-                onCancelNewCard={() => {
-                  setShowNewCard(null);
-                  setNewCardTitle('');
+        {/* Filter Bar */}
+        <div
+          className="relative z-10"
+          style={{
+            margin: '0 16px',
+          }}
+        >
+          <div
+            className="flex items-center gap-3"
+            style={{
+              padding: '8px 0',
+            }}
+          >
+            {/* Filtros Toggle Button */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center gap-2 transition-all hover:scale-105"
+              style={{
+                padding: '6px 14px',
+                borderRadius: '9px',
+                background: showFilters ? 'var(--accent-bg-medium)' : 'var(--border-default)',
+                color: showFilters ? 'var(--accent)' : 'var(--text-secondary)',
+                fontSize: '12px',
+                fontWeight: 500,
+                border: showFilters ? '1px solid var(--border-accent-strong)' : '1px solid var(--border-default)',
+                position: 'relative',
+              }}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              Filtros
+              {hasActiveFilters && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-3px',
+                    right: '-3px',
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: 'var(--accent)',
+                    boxShadow: 'var(--shadow-glow)',
+                  }}
+                />
+              )}
+            </button>
+
+            {/* Filter Stats Badge */}
+            {hasActiveFilters && filterStats && (
+              <span
+                style={{
+                  fontSize: '11px',
+                  color: 'var(--text-faint)',
+                  fontWeight: 500,
                 }}
-                isCreatingCard={createCardMutation.isPending}
-                draggingCardId={draggingCardId}
-                onCardClick={setSelectedCard}
-                onCardContextMenu={handleCardContextMenu}
-                onListMenuClick={handleListMenuClick}
-                onRenameList={handleRenameList}
-                searchTerm={searchTerm}
-                highlightedCards={highlightedCards}
-              />
+              >
+                Mostrando {filterStats.visible} de {filterStats.total} cards
+              </span>
+            )}
+          </div>
+
+          {/* Expanded Filter Dropdowns */}
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2, ease: 'easeInOut' }}
+                style={{ overflow: 'hidden' }}
+              >
+                <div
+                  className="flex items-center gap-3 flex-wrap"
+                  style={{
+                    padding: '8px 0 10px',
+                  }}
+                >
+                  {/* Label Filter */}
+                  <div className="flex flex-col gap-1">
+                    <label style={{ fontSize: '10px', color: 'var(--text-faint)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Etiqueta
+                    </label>
+                    <select
+                      value={filterLabel}
+                      onChange={(e) => setFilterLabel(e.target.value)}
+                      style={{
+                        padding: '6px 28px 6px 10px',
+                        borderRadius: '8px',
+                        background: 'var(--surface-input)',
+                        color: 'var(--text-primary)',
+                        fontSize: '12px',
+                        border: filterLabel ? '1px solid var(--border-focus)' : '1px solid var(--border-accent-medium)',
+                        outline: 'none',
+                        cursor: 'pointer',
+                        minWidth: '150px',
+                        appearance: 'none' as const,
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b8fa3' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 8px center',
+                      }}
+                    >
+                      <option value="">Todas</option>
+                      {board?.labels?.map((label: any) => (
+                        <option key={label.id} value={label.id}>
+                          {label.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Member Filter */}
+                  <div className="flex flex-col gap-1">
+                    <label style={{ fontSize: '10px', color: 'var(--text-faint)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Membro
+                    </label>
+                    <select
+                      value={filterMember}
+                      onChange={(e) => setFilterMember(e.target.value)}
+                      style={{
+                        padding: '6px 28px 6px 10px',
+                        borderRadius: '8px',
+                        background: 'var(--surface-input)',
+                        color: 'var(--text-primary)',
+                        fontSize: '12px',
+                        border: filterMember ? '1px solid var(--border-focus)' : '1px solid var(--border-accent-medium)',
+                        outline: 'none',
+                        cursor: 'pointer',
+                        minWidth: '150px',
+                        appearance: 'none' as const,
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b8fa3' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 8px center',
+                      }}
+                    >
+                      <option value="">Todos</option>
+                      {board?.members?.map((member: any) => (
+                        <option key={member.user.id} value={member.user.id}>
+                          {member.user.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Due Date Filter */}
+                  <div className="flex flex-col gap-1">
+                    <label style={{ fontSize: '10px', color: 'var(--text-faint)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Data de entrega
+                    </label>
+                    <select
+                      value={filterDueDate}
+                      onChange={(e) => setFilterDueDate(e.target.value)}
+                      style={{
+                        padding: '6px 28px 6px 10px',
+                        borderRadius: '8px',
+                        background: 'var(--surface-input)',
+                        color: 'var(--text-primary)',
+                        fontSize: '12px',
+                        border: filterDueDate ? '1px solid var(--border-focus)' : '1px solid var(--border-accent-medium)',
+                        outline: 'none',
+                        cursor: 'pointer',
+                        minWidth: '150px',
+                        appearance: 'none' as const,
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b8fa3' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 8px center',
+                      }}
+                    >
+                      <option value="">Todas</option>
+                      <option value="overdue">Vencidas</option>
+                      <option value="today">Hoje</option>
+                      <option value="week">Esta semana</option>
+                      <option value="none">Sem prazo</option>
+                    </select>
+                  </div>
+
+                  {/* Clear Filters Button */}
+                  {hasActiveFilters && (
+                    <div className="flex flex-col gap-1">
+                      <label style={{ fontSize: '10px', color: 'transparent', fontWeight: 600 }}>
+                        &nbsp;
+                      </label>
+                      <button
+                        onClick={clearAllFilters}
+                        className="flex items-center gap-1.5 transition-all hover:scale-105"
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          background: 'rgba(239, 68, 68, 0.1)',
+                          color: '#ef4444',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          border: '1px solid rgba(239, 68, 68, 0.2)',
+                        }}
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Limpar filtros
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Board Content */}
+        {viewMode === 'calendar' ? (
+          <div className="flex-1 overflow-auto relative z-10">
+            <CalendarView
+              board={board}
+              onCardClick={setSelectedCard}
+            />
+          </div>
+        ) : viewMode === 'table' ? (
+          <div className="flex-1 overflow-auto relative z-10">
+            <TableView
+              board={board}
+              onCardClick={(card) => setSelectedCard(card)}
+            />
+          </div>
+        ) : viewMode === 'timeline' ? (
+          <div className="flex-1 overflow-auto relative z-10">
+            <TimelineView
+              board={board}
+              onCardClick={(card) => setSelectedCard(card)}
+            />
+          </div>
+        ) : (
+        <div className="flex-1 overflow-x-auto overflow-y-hidden relative z-10" style={{ padding: '0 16px 12px' }}>
+        <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <Droppable droppableId="board-lists" type="LIST" direction="horizontal">
+            {(boardProvided) => (
+              <div
+                ref={boardProvided.innerRef}
+                {...boardProvided.droppableProps}
+                className="flex h-full items-start"
+                style={{ gap: '14px' }}
+              >
+            {/* Lists */}
+            {filteredLists.map((list, listIndex) => (
+              <Draggable key={list.id} draggableId={`list-${list.id}`} index={listIndex}>
+                {(listDragProvided) => (
+                  <div
+                    ref={listDragProvided.innerRef}
+                    {...listDragProvided.draggableProps}
+                    {...listDragProvided.dragHandleProps}
+                    style={{
+                      ...listDragProvided.draggableProps.style,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <ListColumn
+                      list={list}
+                      showNewCard={showNewCard === list.id}
+                      newCardTitle={newCardTitle}
+                      onShowNewCard={() => setShowNewCard(list.id)}
+                      onNewCardTitleChange={setNewCardTitle}
+                      onCreateCard={() => handleCreateCard(list.id)}
+                      onCancelNewCard={() => {
+                        setShowNewCard(null);
+                        setNewCardTitle('');
+                      }}
+                      isCreatingCard={createCardMutation.isPending}
+                      draggingCardId={draggingCardId}
+                      onCardClick={setSelectedCard}
+                      onCardContextMenu={handleCardContextMenu}
+                      onListMenuClick={handleListMenuClick}
+                      onRenameList={handleRenameList}
+                      onToggleCardComplete={(cardId: string, isCompleted: boolean) => {
+                        updateCardMutation.mutate({ cardId, updates: { isCompleted } });
+                      }}
+                      searchTerm={searchTerm}
+                      highlightedCards={highlightedCards}
+                    />
+                  </div>
+                )}
+              </Draggable>
             ))}
+            {boardProvided.placeholder}
 
           {/* Add List */}
           {showNewList ? (
             <div
               className="flex-shrink-0 w-[280px] rounded-[14px] p-4 shadow-lg"
               style={{
-                background: 'rgba(15, 17, 23, 0.78)',
+                background: 'var(--surface-overlay)',
                 backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
+                border: '1px solid var(--border-default)',
               }}
             >
               <form onSubmit={handleCreateList}>
@@ -1445,9 +1628,9 @@ export default function BoardPage() {
                   placeholder="Digite o nome da lista..."
                   className="w-full px-4 py-2.5 rounded-xl focus:outline-none"
                   style={{
-                    background: 'rgba(25, 28, 40, 0.6)',
+                    background: 'var(--surface-card-solid)',
                     color: 'var(--text-primary)',
-                    border: '1.5px solid rgba(102, 126, 234, 0.3)',
+                    border: '1.5px solid var(--border-accent-strong)',
                   }}
                   autoFocus
                   onKeyDown={(e) => {
@@ -1463,7 +1646,7 @@ export default function BoardPage() {
                     disabled={!newListTitle.trim() || createListMutation.isPending}
                     className="px-4 py-2 text-white rounded-lg transition-all text-sm font-medium disabled:opacity-50"
                     style={{
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      background: 'var(--gradient-primary)',
                     }}
                   >
                     Adicionar lista
@@ -1476,8 +1659,8 @@ export default function BoardPage() {
                     }}
                     className="px-3 py-2 rounded-lg transition-colors text-sm"
                     style={{
-                      color: '#8b8fa3',
-                      background: 'rgba(255, 255, 255, 0.05)',
+                      color: 'var(--text-faint)',
+                      background: 'var(--surface-subtle)',
                     }}
                   >
                     Cancelar
@@ -1490,26 +1673,29 @@ export default function BoardPage() {
               onClick={() => setShowNewList(true)}
               className="flex-shrink-0 w-[280px] h-auto min-h-[100px] rounded-[14px] transition-all flex flex-col items-center justify-center gap-1.5 font-medium"
               style={{
-                background: 'rgba(15, 17, 23, 0.35)',
+                background: 'var(--surface-overlay)',
                 backdropFilter: 'blur(10px)',
-                border: '1.5px dashed rgba(255, 255, 255, 0.08)',
-                color: '#5a5f73',
+                border: '1.5px dashed var(--border-visible)',
+                color: 'var(--text-dimmed)',
               }}
             >
               <div
                 className="w-8 h-8 rounded-lg flex items-center justify-center transition-transform"
-                style={{ background: 'rgba(102, 126, 234, 0.1)' }}
+                style={{ background: 'var(--accent-bg)' }}
               >
-                <svg className="w-4 h-4" style={{ color: '#667eea' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" style={{ color: 'var(--accent)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
                 </svg>
               </div>
-              <span style={{ fontSize: '12px', color: '#5a5f73', fontWeight: 500 }}>Adicionar lista</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-dimmed)', fontWeight: 500 }}>Adicionar lista</span>
             </button>
           )}
-          </div>
+              </div>
+            )}
+          </Droppable>
         </DragDropContext>
         </div>
+        )}
 
         {/* Card Modal */}
       {selectedCard && (
@@ -1626,7 +1812,7 @@ export default function BoardPage() {
                   onClick={handleSaveCustomColor}
                   className="flex-1 px-4 py-2 rounded-xl font-medium transition-all hover:scale-105 text-white text-sm"
                   style={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    background: 'var(--gradient-primary)',
                   }}
                 >
                   Salvar e Aplicar
@@ -1800,7 +1986,7 @@ export default function BoardPage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
               </svg>
-              Editar etiqueta
+              Etiqueta
             </button>
             <button
               onClick={() => handleArchiveCard(cardMenuOpen.card.id)}
@@ -1885,7 +2071,7 @@ export default function BoardPage() {
                 disabled={!editingCardTitle.title.trim()}
                 className="px-4 py-2 rounded-lg transition-colors text-white disabled:opacity-50"
                 style={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: 'var(--gradient-primary)',
                 }}
               >
                 Salvar
@@ -1974,7 +2160,7 @@ export default function BoardPage() {
                 disabled={!formatDateToISO(dateInputValue)}
                 className="flex-1 px-4 py-2 rounded-lg transition-colors text-white disabled:opacity-50"
                 style={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: 'var(--gradient-primary)',
                 }}
               >
                 Salvar
@@ -2013,7 +2199,7 @@ export default function BoardPage() {
                     }}
                     className="w-full p-2 rounded-lg border transition-all hover:scale-105"
                     style={{
-                      borderColor: cardCoverDropdownOpen.coverAttachmentId === att.id ? '#667eea' : 'var(--border-color)',
+                      borderColor: cardCoverDropdownOpen.coverAttachmentId === att.id ? 'var(--accent)' : 'var(--border-color)',
                       background: 'var(--surface-secondary)',
                     }}
                   >
@@ -2045,7 +2231,7 @@ export default function BoardPage() {
               onClick={() => setCardCoverDropdownOpen(null)}
               className="w-full px-4 py-2 rounded-lg transition-colors text-white"
               style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'var(--gradient-primary)',
               }}
             >
               Fechar
@@ -2055,7 +2241,11 @@ export default function BoardPage() {
       )}
 
       {/* Card Members Dropdown */}
-      {cardMembersDropdownOpen && (
+      {cardMembersDropdownOpen && (() => {
+        const freshCard = board?.lists
+          ?.flatMap((l: any) => l.cards || [])
+          .find((c: any) => c.id === cardMembersDropdownOpen.id) || cardMembersDropdownOpen;
+        return (
         <>
           <div
             className="fixed inset-0 z-40"
@@ -2074,30 +2264,30 @@ export default function BoardPage() {
             {board?.members && board.members.length > 0 ? (
               <div className="space-y-2">
                 {board.members.map((member: any) => {
-                  const isAssigned = cardMembersDropdownOpen.members?.some((m: any) => m.user.id === member.user.id);
+                  const isAssigned = freshCard.members?.some((m: any) => m.user.id === member.user.id);
                   return (
                     <button
                       key={member.user.id}
                       onClick={() => {
                         if (isAssigned) {
                           removeCardMemberMutation.mutate({
-                            cardId: cardMembersDropdownOpen.id,
+                            cardId: freshCard.id,
                             userId: member.user.id,
                           });
                         } else {
                           addCardMemberMutation.mutate({
-                            cardId: cardMembersDropdownOpen.id,
+                            cardId: freshCard.id,
                             userId: member.user.id,
                           });
                         }
                       }}
                       className="w-full flex items-center gap-3 p-3 rounded-lg transition-all hover:scale-105"
                       style={{
-                        background: isAssigned ? '#667eea' : 'var(--surface-secondary)',
+                        background: isAssigned ? 'var(--accent)' : 'var(--surface-secondary)',
                         color: isAssigned ? 'white' : 'var(--text-primary)',
                       }}
                     >
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold" style={{ background: '#667eea' }}>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold" style={{ background: 'var(--accent)' }}>
                         {member.user.name.charAt(0).toUpperCase()}
                       </div>
                       <span className="flex-1 text-left">{member.user.name}</span>
@@ -2119,17 +2309,22 @@ export default function BoardPage() {
               onClick={() => setCardMembersDropdownOpen(null)}
               className="w-full mt-4 px-4 py-2 rounded-lg transition-colors text-white"
               style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'var(--gradient-primary)',
               }}
             >
               Fechar
             </button>
           </div>
         </>
-      )}
+        );
+      })()}
 
       {/* Card Labels Dropdown */}
-      {cardLabelsDropdownOpen && (
+      {cardLabelsDropdownOpen && (() => {
+        const freshCard = board?.lists
+          ?.flatMap((l: any) => l.cards || [])
+          .find((c: any) => c.id === cardLabelsDropdownOpen.id) || cardLabelsDropdownOpen;
+        return (
         <>
           <div
             className="fixed inset-0 z-40"
@@ -2148,19 +2343,19 @@ export default function BoardPage() {
             {board?.labels && board.labels.length > 0 ? (
               <div className="space-y-2">
                 {board.labels.map((label: any) => {
-                  const isAssigned = cardLabelsDropdownOpen.labels?.some((l: any) => l.label.id === label.id);
+                  const isAssigned = freshCard.labels?.some((l: any) => l.label.id === label.id);
                   return (
                     <button
                       key={label.id}
                       onClick={() => {
                         if (isAssigned) {
                           removeCardLabelMutation.mutate({
-                            cardId: cardLabelsDropdownOpen.id,
+                            cardId: freshCard.id,
                             labelId: label.id,
                           });
                         } else {
                           addCardLabelMutation.mutate({
-                            cardId: cardLabelsDropdownOpen.id,
+                            cardId: freshCard.id,
                             labelId: label.id,
                           });
                         }
@@ -2191,14 +2386,15 @@ export default function BoardPage() {
               onClick={() => setCardLabelsDropdownOpen(null)}
               className="w-full mt-4 px-4 py-2 rounded-lg transition-colors text-white"
               style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'var(--gradient-primary)',
               }}
             >
               Fechar
             </button>
           </div>
         </>
-      )}
+        );
+      })()}
 
       {/* Background Customization Modal */}
       {showBackgroundModal && (
@@ -2239,7 +2435,7 @@ export default function BoardPage() {
                 onClick={() => setBackgroundType('color')}
                 className="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all"
                 style={{
-                  background: backgroundType === 'color' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'var(--surface-secondary)',
+                  background: backgroundType === 'color' ? 'var(--gradient-primary)' : 'var(--surface-secondary)',
                   color: backgroundType === 'color' ? 'white' : 'var(--text-secondary)',
                 }}
               >
@@ -2249,7 +2445,7 @@ export default function BoardPage() {
                 onClick={() => setBackgroundType('image')}
                 className="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all"
                 style={{
-                  background: backgroundType === 'image' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'var(--surface-secondary)',
+                  background: backgroundType === 'image' ? 'var(--gradient-primary)' : 'var(--surface-secondary)',
                   color: backgroundType === 'image' ? 'white' : 'var(--text-secondary)',
                 }}
               >
@@ -2277,7 +2473,7 @@ export default function BoardPage() {
                       onClick={() => handleApplyBackgroundColor(`linear-gradient(135deg, ${customBoardColor} 0%, ${customBoardColor} 100%)`)}
                       className="flex-1 px-4 py-2 rounded-xl font-medium transition-all hover:scale-105 text-white text-sm"
                       style={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        background: 'var(--gradient-primary)',
                       }}
                     >
                       Aplicar Cor Personalizada
@@ -2391,7 +2587,7 @@ export default function BoardPage() {
                       }}
                       className="px-6 py-3 rounded-xl font-medium transition-all hover:scale-105 text-white text-sm whitespace-nowrap"
                       style={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        background: 'var(--gradient-primary)',
                       }}
                     >
                       Aplicar
@@ -2471,6 +2667,131 @@ export default function BoardPage() {
           isOpen={showMembersModal}
           onClose={() => setShowMembersModal(false)}
         />
+      )}
+
+      {/* Stats Modal */}
+      {board && (
+        <BoardStatsModal
+          board={board}
+          isOpen={showStatsModal}
+          onClose={() => setShowStatsModal(false)}
+        />
+      )}
+      <ConfirmDialog />
+
+      {/* Keyboard Shortcuts Help Overlay */}
+      {showShortcuts && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(8px)',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowShortcuts(false);
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--surface-dropdown)',
+              border: '1px solid var(--border-accent)',
+              borderRadius: '16px',
+              padding: '28px 32px',
+              minWidth: '340px',
+              maxWidth: '420px',
+              position: 'relative',
+            }}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setShowShortcuts(false)}
+              style={{
+                position: 'absolute',
+                top: '14px',
+                right: '14px',
+                width: '28px',
+                height: '28px',
+                borderRadius: '8px',
+                background: 'var(--border-default)',
+                border: 'none',
+                color: 'var(--text-faint)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = 'var(--border-visible)';
+                (e.currentTarget as HTMLButtonElement).style.transform = 'rotate(90deg)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = 'var(--border-default)';
+                (e.currentTarget as HTMLButtonElement).style.transform = 'rotate(0deg)';
+              }}
+            >
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <h2 style={{
+              color: 'var(--text-primary)',
+              fontWeight: 700,
+              fontSize: '18px',
+              marginBottom: '20px',
+            }}>
+              Atalhos de Teclado
+            </h2>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {[
+                { key: 'N', desc: 'Novo card' },
+                { key: 'F', desc: 'Filtros' },
+                { key: '/', desc: 'Buscar' },
+                { key: 'Ctrl+K', desc: 'Buscar' },
+                { key: 'Escape', desc: 'Fechar menu / limpar busca' },
+                { key: '?', desc: 'Mostrar atalhos' },
+              ].map(({ key, desc }) => (
+                <div
+                  key={key}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                  }}
+                >
+                  <kbd
+                    style={{
+                      background: 'var(--surface-board-header)',
+                      border: '1px solid var(--border-accent-strong)',
+                      borderRadius: '6px',
+                      padding: '4px 10px',
+                      fontFamily: 'monospace',
+                      color: 'var(--accent)',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      minWidth: '60px',
+                      textAlign: 'center',
+                      lineHeight: '1.6',
+                    }}
+                  >
+                    {key}
+                  </kbd>
+                  <span style={{ color: 'var(--text-faint)', fontSize: '14px' }}>
+                    {desc}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
       </div>
     </MainLayout>

@@ -99,6 +99,7 @@ export interface Card {
   description?: string;
   position: number;
   dueDate?: string;
+  startDate?: string;
   isCompleted: boolean;
   coverUrl?: string;
   coverAttachmentId?: string;

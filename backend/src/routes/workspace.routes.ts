@@ -6,6 +6,8 @@ import {
   createWorkspace,
   updateWorkspace,
   deleteWorkspace,
+  getWorkspaceMembers,
+  getWorkspaceActivities,
   addMember,
   updateMemberRole,
   removeMember,
@@ -54,6 +56,12 @@ router.put(
 
 // DELETE /api/workspaces/:id
 router.delete('/:id', deleteWorkspace);
+
+// GET /api/workspaces/:id/activities
+router.get('/:id/activities', getWorkspaceActivities);
+
+// GET /api/workspaces/:id/members
+router.get('/:id/members', getWorkspaceMembers);
 
 // POST /api/workspaces/:id/members
 router.post(

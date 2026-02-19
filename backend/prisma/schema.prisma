@@ -150,6 +150,7 @@ model Card {
   description        String?
   position           Int
   dueDate            DateTime? @map("due_date")
+  startDate          DateTime? @map("start_date")
   isCompleted        Boolean   @default(false) @map("is_completed")
   coverUrl           String?   @map("cover_url")
   coverAttachmentId  String?   @map("cover_attachment_id")

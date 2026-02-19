@@ -25,6 +25,9 @@ router.post(
   createList
 );
 
+// PUT /api/lists/reorder (must be before /:id to avoid matching "reorder" as an ID)
+router.put('/reorder', reorderLists);
+
 // PUT /api/lists/:id
 router.put('/:id', updateList);
 
@@ -33,8 +36,5 @@ router.delete('/:id', deleteList);
 
 // POST /api/lists/:id/archive
 router.post('/:id/archive', archiveList);
-
-// PUT /api/lists/reorder
-router.put('/reorder', reorderLists);
 
 export default router;

@@ -4,6 +4,7 @@ import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { io } from '../index';
 import { emitBoardUpdate } from '../services/websocket.service';
+import { activityService } from '../services/activityService';
 
 // GET /api/boards
 export async function getBoards(req: AuthRequest, res: Response): Promise<void> {
@@ -485,10 +486,35 @@ export async function addBoardMember(req: AuthRequest, res: Response): Promise<v
           },
         },
       },
+      select: {
+        id: true,
+        workspaceId: true,
+      },
     });
 
     if (!board) {
       res.status(404).json({ error: 'Board not found or insufficient permissions' });
+      return;
+    }
+
+    // Verify target user is a workspace member
+    const workspaceMember = await prisma.workspaceMember.findFirst({
+      where: {
+        workspaceId: board.workspaceId,
+        userId,
+      },
+    });
+
+    // Also check if user is the workspace owner
+    const workspace = await prisma.workspace.findFirst({
+      where: {
+        id: board.workspaceId,
+        ownerId: userId,
+      },
+    });
+
+    if (!workspaceMember && !workspace) {
+      res.status(400).json({ error: 'User must be a workspace member before being added to a board' });
       return;
     }
 
@@ -509,6 +535,8 @@ export async function addBoardMember(req: AuthRequest, res: Response): Promise<v
         },
       },
     });
+
+    activityService.logBoardMemberAdded(id, req.userId!, member.user.name, role).catch(console.error);
 
     emitBoardUpdate(io, id, 'board:member:added', member);
 
@@ -605,6 +633,14 @@ export async function removeBoardMember(req: AuthRequest, res: Response): Promis
       res.status(404).json({ error: 'Board not found or insufficient permissions' });
       return;
     }
+
+    // Query the member's name before removal for activity logging
+    const memberUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+
+    activityService.logBoardMemberRemoved(id, req.userId!, memberUser?.name || 'Unknown').catch(console.error);
 
     await prisma.boardMember.delete({
       where: {
