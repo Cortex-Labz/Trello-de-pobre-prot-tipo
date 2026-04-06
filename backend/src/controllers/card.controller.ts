@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { Response } from 'express';
 import { validationResult } from 'express-validator';
 import { prisma } from '../utils/prisma';
@@ -402,7 +403,7 @@ export async function moveCard(req: AuthRequest, res: Response): Promise<void> {
     ]);
 
     // Use a transaction to move card and reorder all affected lists
-    const updatedCard = await prisma.$transaction(async (tx) => {
+    const updatedCard = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Move the card to new list/position
       const moved = await tx.card.update({
         where: { id },
@@ -420,10 +421,10 @@ export async function moveCard(req: AuthRequest, res: Response): Promise<void> {
       });
       // The moved card is already at `position`, but others may collide.
       // Re-assign: moved card stays at `position`, shift others around it.
-      const destOrdered = destCards.filter(c => c.id !== id);
+      const destOrdered = destCards.filter((c: { id: string }) => c.id !== id);
       destOrdered.splice(position, 0, { id });
       await Promise.all(
-        destOrdered.map((c, idx) =>
+        destOrdered.map((c: { id: string }, idx: number) =>
           tx.card.update({ where: { id: c.id }, data: { position: idx } })
         )
       );
@@ -436,7 +437,7 @@ export async function moveCard(req: AuthRequest, res: Response): Promise<void> {
           select: { id: true },
         });
         await Promise.all(
-          srcCards.map((c, idx) =>
+          srcCards.map((c: { id: string }, idx: number) =>
             tx.card.update({ where: { id: c.id }, data: { position: idx } })
           )
         );

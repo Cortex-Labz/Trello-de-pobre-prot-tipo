@@ -140,7 +140,7 @@ export async function inviteToBoard(req: AuthRequest, res: Response): Promise<vo
     }
 
     const isWorkspaceOwner = board.workspace.ownerId === req.userId;
-    const isBoardAdmin = board.members.some(m => m.role === 'ADMIN');
+    const isBoardAdmin = board.members.some((m: { role: string }) => m.role === 'ADMIN');
 
     if (!isWorkspaceOwner && !isBoardAdmin) {
       res.status(403).json({ error: 'Insufficient permissions' });

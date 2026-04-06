@@ -564,7 +564,7 @@ export async function getWorkspaceActivities(req: AuthRequest, res: Response): P
       return;
     }
 
-    const boardIds = workspace.boards.map(b => b.id);
+    const boardIds = workspace.boards.map((b: { id: string }) => b.id);
 
     if (boardIds.length === 0) {
       res.json({ activities: [], total: 0 });

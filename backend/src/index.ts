@@ -20,6 +20,7 @@ import attachmentRoutes from './routes/attachment.routes';
 import activityRoutes from './routes/activity.routes';
 import notificationRoutes from './routes/notification.routes';
 import invitationRoutes from './routes/invitation.routes';
+import operatorRoutes from './routes/operator.routes';
 import { errorHandler } from './middleware/error.middleware';
 import { initializeWebSocket } from './services/websocket.service';
 import { setIO } from './utils/socket';
@@ -66,6 +67,7 @@ app.use('/api/labels', labelRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/invitations', invitationRoutes);
+app.use('/api/operator', operatorRoutes);
 
 // Serve frontend in production
 if (process.env.NODE_ENV === 'production') {

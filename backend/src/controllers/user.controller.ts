@@ -32,14 +32,14 @@ export async function searchUsers(req: AuthRequest, res: Response): Promise<void
 
     // Filter users client-side with case-insensitive matching
     const users = allUsers
-      .filter((user) =>
+      .filter((user: { id: string; email: string; name: string }) =>
         user.email.toLowerCase().includes(query) ||
         user.name.toLowerCase().includes(query)
       )
       .slice(0, 10); // Limit results to 10 users
 
     // Filter out the current user from results
-    const filteredUsers = users.filter(user => user.id !== req.userId);
+    const filteredUsers = users.filter((user: { id: string }) => user.id !== req.userId);
 
     res.json({ users: filteredUsers });
   } catch (error) {
